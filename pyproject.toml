@@ -1,0 +1,26 @@
+[project]
+name = "voxtus"
+version = "0.1.0"
+description = "Transcribe YouTube videos and audio files to text using faster-whisper"
+authors = [{ name = "Johan Thorén", email = "johan@thoren.xyz" }]
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "faster-whisper",
+    "yt-dlp"
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+voxtus = "voxtus.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+addopts = "-ra"

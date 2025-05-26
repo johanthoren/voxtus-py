@@ -1,0 +1,46 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Installer logs
+pip-log.txt
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+.cache
+pytest_cache/
+nosetests.xml
+
+# Transcripts or generated outputs (optional, depending on workflow)
+*.txt
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# macOS / system files
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
