@@ -26,6 +26,7 @@ GNU Affero General Public License for more details.
 See <https://www.gnu.org/licenses/agpl-3.0.html> for full license text.
 """
 import argparse
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -36,6 +37,8 @@ from pathlib import Path
 
 from faster_whisper import WhisperModel
 from yt_dlp import YoutubeDL
+
+__version__ = importlib.metadata.version("voxtus")
 
 
 def create_print_wrapper(verbose_level: int, stdout_mode: bool):
@@ -130,16 +133,23 @@ def check_ffmpeg(vprint_func=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Transcribe Internet videos and media files to text using faster-whisper.")
-    parser.add_argument("input", help="Internet URL or local media file")
+    parser.add_argument("input", nargs='?', help="Internet URL or local media file (optional if --version is used)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (use -vv for debug output)")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep the audio file")
     parser.add_argument("-f", "--force", action="store_true", help="Overwrite any existing transcript file without confirmation")
     parser.add_argument("-n", "--name", help="Base name for audio and transcript file (no extension)")
     parser.add_argument("-o", "--output", help="Directory to save output files to (default: current directory)")
     parser.add_argument("--stdout", action="store_true", help="Output transcript to stdout only (no file written, all other output silenced)")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}", help="Show program's version number and exit")
 
     args = parser.parse_args()
     
+    # If --version is used, argparse handles it and exits.
+    # If no input is provided and --version is not used, print help and exit.
+    if not args.input and not any(arg in sys.argv for arg in ['--version', '-h', '--help']):
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
     # Create print wrapper
     vprint = create_print_wrapper(args.verbose, args.stdout)
     
