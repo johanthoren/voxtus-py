@@ -4,12 +4,9 @@ version = "0.1.1"
 description = "Transcribe YouTube videos and audio files to text using faster-whisper"
 authors = [{ name = "Johan Thorén", email = "johan@thoren.xyz" }]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "AGPL-3.0-or-later" }
-dependencies = [
-    "faster-whisper==1.1.1",
-    "yt-dlp==2025.5.22"
-]
+dependencies = ["faster-whisper==1.1.1", "yt-dlp==2025.5.22"]
 
 [project.optional-dependencies]
 test = ["pytest"]
