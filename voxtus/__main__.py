@@ -48,7 +48,7 @@ def create_print_wrapper(verbose_level: int, stdout_mode: bool):
             level: Required verbosity level (0=always, 1=-v, 2=-vv)
         """
         if not stdout_mode and verbose_level >= level:
-            print(message)
+            print(message, file=sys.stderr)
     
     return vprint
 
@@ -98,7 +98,7 @@ def transcribe_audio(audio_file: Path, output_file: Path, verbose: bool, vprint_
     if vprint_func:
         vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
     else:
-        print("⏳ Loading transcription model (this may take a few seconds the first time)...")
+        print("⏳ Loading transcription model (this may take a few seconds the first time)...", file=sys.stderr)
     model = WhisperModel("base", compute_type="auto")
     segments, _ = model.transcribe(str(audio_file))
 
@@ -110,7 +110,7 @@ def transcribe_audio(audio_file: Path, output_file: Path, verbose: bool, vprint_
                 if vprint_func:
                     vprint_func(line, 1)
                 else:
-                    print(line)
+                    print(line, file=sys.stderr)
 
 def check_ffmpeg(vprint_func=None):
     try:
@@ -122,10 +122,10 @@ def check_ffmpeg(vprint_func=None):
             vprint_func("  - Ubuntu/Debian: sudo apt install ffmpeg")
             vprint_func("  - Windows: Download from https://ffmpeg.org/download.html")
         else:
-            print("❌ ffmpeg is required but not found. Please install ffmpeg:")
-            print("  - macOS: brew install ffmpeg")
-            print("  - Ubuntu/Debian: sudo apt install ffmpeg")
-            print("  - Windows: Download from https://ffmpeg.org/download.html")
+            print("❌ ffmpeg is required but not found. Please install ffmpeg:", file=sys.stderr)
+            print("  - macOS: brew install ffmpeg", file=sys.stderr)
+            print("  - Ubuntu/Debian: sudo apt install ffmpeg", file=sys.stderr)
+            print("  - Windows: Download from https://ffmpeg.org/download.html", file=sys.stderr)
         sys.exit(1)
 
 def main():
@@ -185,7 +185,7 @@ def main():
             if not audio_file.exists():
                 vprint("❌ No audio file found after processing.")
                 vprint(f"Expected file: '{audio_file}'", 2)
-                vprint(f"Files in workdir: {[f'"{f}"' for f in workdir.glob('*')]}", 2)
+                vprint(f"Files in workdir: {[str(f) for f in workdir.glob('*')]}", 2)
                 sys.exit(1)
 
             vprint(f"📁 Found audio file: '{audio_file}'", 2)
