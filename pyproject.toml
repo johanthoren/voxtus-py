@@ -1,6 +1,6 @@
 [project]
 name = "voxtus"
-version = "0.1.0"
+version = "0.1.1"
 description = "Transcribe YouTube videos and audio files to text using faster-whisper"
 authors = [{ name = "Johan Thorén", email = "johan@thoren.xyz" }]
 readme = "README.md"
