@@ -1,5 +1,5 @@
 """
-Voxtus: Transcribe audio from Internet media or local media files using faster-whisper.
+Voxtus: Transcribe Internet videos and media files to text using faster-whisper.
 
 This CLI tool supports:
 - Downloading media from the Internet via the yt_dlp library
@@ -32,8 +32,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
 from faster_whisper import WhisperModel
 from yt_dlp import YoutubeDL
+
 
 def download_audio(input_path: str, output_path: Path):
     ydl_opts = {
@@ -75,7 +77,7 @@ def check_ffmpeg():
         sys.exit(1)
 
 def main():
-    parser = argparse.ArgumentParser(description="Transcribe audio from Internet media or local media files using faster-whisper.")
+    parser = argparse.ArgumentParser(description="Transcribe Internet videos and media files to text using faster-whisper.")
     parser.add_argument("input", help="Internet URL or local media file")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print transcript to stdout")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep the audio file")

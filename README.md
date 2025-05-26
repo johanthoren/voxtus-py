@@ -1,6 +1,6 @@
 # 🗣️ Voxtus
 
-**Voxtus is a command-line tool for transcribing YouTube videos or local audio files into readable text using [faster-whisper](https://github.com/guillaumekln/faster-whisper).**
+**Voxtus is a command-line tool for transcribing Internet videos and media files to text using [faster-whisper](https://github.com/guillaumekln/faster-whisper).**
 
 It supports `.mp3` files and can download, transcribe, and optionally retain the original audio. It's built in Python and installable as a proper CLI via PyPI or from source.
 
