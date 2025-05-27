@@ -34,9 +34,11 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeVar, Union
 
 from faster_whisper import WhisperModel
+from returns.pipeline import flow, is_successful
+from returns.result import Failure, Result, Success, safe
 from yt_dlp import YoutubeDL
 
 __version__ = importlib.metadata.version("voxtus")
@@ -45,23 +47,23 @@ __version__ = importlib.metadata.version("voxtus")
 @dataclass
 class Config:
     """Configuration for the transcription process."""
-    input_path: str
-    verbose_level: int
-    keep_audio: bool
-    force_overwrite: bool
     custom_name: Optional[str]
+    force_overwrite: bool
+    input_path: str
+    keep_audio: bool
     output_dir: Path
     stdout_mode: bool
+    verbose_level: int
 
 
 @dataclass
 class ProcessingContext:
     """Context for the processing workflow."""
     config: Config
-    vprint: Callable[[str, int], None]
-    workdir: Path
     is_url: bool
     token: str
+    vprint: Callable[[str, int], None]
+    workdir: Path
 
 
 def create_print_wrapper(verbose_level: int, stdout_mode: bool) -> Callable[[str, int], None]:
@@ -109,10 +111,10 @@ def create_ydl_options(debug: bool, stdout_mode: bool, output_path: Path) -> dic
     return base_opts
 
 
+@safe
 def extract_and_download_media(input_path: str, output_path: Path, debug: bool, stdout_mode: bool) -> str:
     """Extract media info and download audio."""
     ydl_opts = create_ydl_options(debug, stdout_mode, output_path)
-    
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(input_path, download=False)
         title = info.get('title', 'video')
@@ -120,16 +122,14 @@ def extract_and_download_media(input_path: str, output_path: Path, debug: bool, 
         return title
 
 
-def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode: bool = False, vprint_func=None) -> str:
+def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode: bool = False, vprint_func=None) -> Result[str, str]:
     """Download and convert audio from URL or local file."""
-    try:
-        return extract_and_download_media(input_path, output_path, debug, stdout_mode)
-    except Exception as e:
-        if debug and not stdout_mode and vprint_func:
-            vprint_func(f"❌ yt-dlp error: {e}")
-            # Retry with verbose output for debugging
-            return extract_and_download_media(input_path, output_path, False, stdout_mode)
-        raise
+    result = extract_and_download_media(input_path, output_path, debug, stdout_mode)
+    if not is_successful(result) and debug and not stdout_mode and vprint_func:
+        vprint_func(f"❌ yt-dlp error: {result.failure()}")
+        # Retry with verbose output for debugging
+        return extract_and_download_media(input_path, output_path, False, stdout_mode)
+    return result
 
 
 def format_transcript_line(segment) -> str:
@@ -173,12 +173,12 @@ def check_ffmpeg(vprint_func: Callable[[str, int], None]):
         sys.exit(1)
 
 
-def validate_input_file(file_path: str, vprint_func: Callable[[str, int], None]) -> Path:
+@safe
+def validate_input_file(file_path: str) -> Path:
     """Validate that input file exists and return resolved path."""
     source_file = Path(file_path).expanduser().resolve()
     if not source_file.exists():
-        vprint_func(f"❌ Local file not found: '{source_file}'")
-        sys.exit(1)
+        raise ValueError(f"File not found: {source_file}")
     return source_file
 
 
@@ -187,62 +187,78 @@ def create_output_template(workdir: Path, token: str) -> Path:
     return workdir / f"{token}.%(ext)s"
 
 
-def find_audio_file(workdir: Path, token: str, vprint_func: Callable[[str, int], None]) -> Path:
+@safe
+def find_audio_file(workdir: Path, token: str) -> Path:
     """Find the generated audio file and validate it exists."""
     audio_file = workdir / f"{token}.mp3"
     if not audio_file.exists():
-        vprint_func("❌ No audio file found after processing.")
-        vprint_func(f"Expected file: '{audio_file}'", 2)
-        vprint_func(f"Files in workdir: {[str(f) for f in workdir.glob('*')]}", 2)
-        sys.exit(1)
+        raise ValueError("Audio file not found")
     return audio_file
 
 
-def process_url_input(ctx: ProcessingContext) -> tuple[str, Path]:
-    """Process URL input and return title and audio file path."""
-    ctx.vprint(f"🎧 Downloading media from: {ctx.config.input_path}")
-    output_template = create_output_template(ctx.workdir, ctx.token)
-    
-    try:
-        title = download_audio(
-            ctx.config.input_path, 
-            output_template, 
-            ctx.config.verbose_level >= 2 and not ctx.config.stdout_mode, 
-            ctx.config.stdout_mode, 
-            ctx.vprint
-        )
-    except Exception as e:
-        ctx.vprint(f"❌ Error downloading media: {e}")
-        sys.exit(1)
+def download_media_from_url(ctx: ProcessingContext, output_template: Path) -> Result[str, str]:
+    """Download media from URL."""
+    return download_audio(
+        ctx.config.input_path, 
+        output_template, 
+        ctx.config.verbose_level >= 2 and not ctx.config.stdout_mode, 
+        ctx.config.stdout_mode, 
+        ctx.vprint
+    )
 
-    audio_file = find_audio_file(ctx.workdir, ctx.token, ctx.vprint)
+
+def find_audio_file_with_context(ctx: ProcessingContext) -> Result[Path, str]:
+    """Find audio file using context."""
+    return find_audio_file(ctx.workdir, ctx.token)
+
+
+def log_and_combine_results(ctx: ProcessingContext, title: str, audio_file: Path) -> tuple[str, Path]:
+    """Log and combine results."""
     ctx.vprint(f"📁 Found audio file: '{audio_file}'", 2)
     return title, audio_file
 
 
-def process_file_input(ctx: ProcessingContext) -> tuple[str, Path]:
-    """Process local file input and return title and audio file path."""
-    source_file = validate_input_file(ctx.config.input_path, ctx.vprint)
-    ctx.vprint(f"🎧 Converting media file: '{source_file}'")
+def process_url_input(ctx: ProcessingContext) -> Result[tuple[str, Path], str]:
+    """Process URL input and return title and audio file path."""
+    ctx.vprint(f"🎧 Downloading media from: {ctx.config.input_path}")
+    output_template = create_output_template(ctx.workdir, ctx.token)
     
+    return (
+        download_media_from_url(ctx, output_template)
+        .bind(lambda title: 
+            find_audio_file_with_context(ctx)
+            .map(lambda audio_file: log_and_combine_results(ctx, title, audio_file))
+        )
+    )
+
+
+def convert_local_file(ctx: ProcessingContext, source_file: Path) -> Result[str, str]:
+    """Convert a validated local file to audio."""
+    ctx.vprint(f"🎧 Converting media file: '{source_file}'")
     output_template = create_output_template(ctx.workdir, ctx.token)
     file_url = f"file://{source_file}"
     
-    try:
-        title = download_audio(
-            file_url, 
-            output_template, 
-            ctx.config.verbose_level >= 2 and not ctx.config.stdout_mode, 
-            ctx.config.stdout_mode, 
-            ctx.vprint
-        )
-    except Exception as e:
-        ctx.vprint(f"❌ Error processing media file: {e}")
-        ctx.vprint("The file format may not be supported. Please ensure it's a valid media file.")
-        sys.exit(1)
+    return download_audio(
+        file_url, 
+        output_template, 
+        ctx.config.verbose_level >= 2 and not ctx.config.stdout_mode, 
+        ctx.config.stdout_mode, 
+        ctx.vprint
+    )
 
-    audio_file = find_audio_file(ctx.workdir, ctx.token, ctx.vprint)
-    return title, audio_file
+
+def process_file_input(ctx: ProcessingContext) -> Result[tuple[str, Path], str]:
+    """Process local file input and return title and audio file path."""
+    return (
+        validate_input_file(ctx.config.input_path)
+        .bind(lambda source_file: 
+            convert_local_file(ctx, source_file)
+            .bind(lambda title:
+                find_audio_file_with_context(ctx)
+                .map(lambda audio_file: log_and_combine_results(ctx, title, audio_file))
+            )
+        )
+    )
 
 
 def get_final_name(title: str, custom_name: Optional[str]) -> str:
@@ -250,35 +266,27 @@ def get_final_name(title: str, custom_name: Optional[str]) -> str:
     return custom_name if custom_name else title
 
 
-def check_file_overwrite(final_transcript: Path, force_overwrite: bool, vprint_func: Callable[[str, int], None]):
+@safe
+def check_file_overwrite(final_transcript: Path, force_overwrite: bool) -> None:
     """Check if file should be overwritten and handle user confirmation."""
     if final_transcript.exists() and not force_overwrite:
         response = input(f"⚠️ Transcript file '{final_transcript}' already exists. Overwrite? [y/N] ").lower()
         if response != 'y':
-            vprint_func("Aborted.")
-            sys.exit(0)
-    elif final_transcript.exists() and force_overwrite:
-        vprint_func(f"⚠️ Option --force used. Overwriting existing '{final_transcript}' without confirmation.")
+            raise ValueError("User aborted")
 
 
-def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str):
-    """Handle file-based output (non-stdout mode)."""
-    final_name = get_final_name(title, ctx.config.custom_name)
-    final_transcript = ctx.config.output_dir / f"{final_name}.txt"
-    
-    check_file_overwrite(final_transcript, ctx.config.force_overwrite, ctx.vprint)
-    
-    ctx.vprint(f"📝 Transcribing to '{audio_file.with_suffix('.txt').name}'...", 2)
-    ctx.vprint("📝 Transcribing audio...", 1)
-    
-    # Transcribe to temporary file
+def create_transcript_file(audio_file: Path, ctx: ProcessingContext) -> Path:
+    """Create transcript file."""
     transcript_file = audio_file.with_suffix(".txt")
     transcribe_to_file(audio_file, transcript_file, ctx.config.verbose_level >= 1, ctx.vprint)
-    
-    # Move to final location
+    return transcript_file
+
+
+def move_files_and_log(ctx: ProcessingContext, audio_file: Path, transcript_file: Path, final_name: str) -> None:
+    """Handle file moving and logging."""
+    final_transcript = ctx.config.output_dir / f"{final_name}.txt"
     shutil.move(str(transcript_file), final_transcript)
     
-    # Handle audio file
     if ctx.config.keep_audio:
         final_audio = ctx.config.output_dir / f"{final_name}.mp3"
         shutil.move(str(audio_file), final_audio)
@@ -289,24 +297,44 @@ def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str):
     ctx.vprint(f"✅ Transcript saved to: '{final_transcript}'")
 
 
+def transcribe_and_save(ctx: ProcessingContext, audio_file: Path, title: str) -> Result[None, str]:
+    """Transcribe audio and save files after validation."""
+    final_name = get_final_name(title, ctx.config.custom_name)
+    ctx.vprint(f"📝 Transcribing to '{audio_file.with_suffix('.txt').name}'...", 2)
+    ctx.vprint("📝 Transcribing audio...", 1)
+    
+    transcript_file = create_transcript_file(audio_file, ctx)
+    move_files_and_log(ctx, audio_file, transcript_file, final_name)
+    return Success(None)
+
+
+def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str) -> Result[None, str]:
+    """Handle file-based output (non-stdout mode)."""
+    final_name = get_final_name(title, ctx.config.custom_name)
+    final_transcript = ctx.config.output_dir / f"{final_name}.txt"
+    
+    return (
+        check_file_overwrite(final_transcript, ctx.config.force_overwrite)
+        .bind(lambda _: transcribe_and_save(ctx, audio_file, title))
+    )
+
+
 def handle_stdout_output(audio_file: Path):
     """Handle stdout-based output."""
     transcribe_to_stdout(audio_file)
 
 
-def process_audio(ctx: ProcessingContext):
+def process_audio(ctx: ProcessingContext) -> Result[None, str]:
     """Main audio processing workflow."""
-    # Process input based on type
-    if ctx.is_url:
-        title, audio_file = process_url_input(ctx)
-    else:
-        title, audio_file = process_file_input(ctx)
+    input_processor = process_url_input if ctx.is_url else process_file_input
     
-    # Handle output based on mode
-    if ctx.config.stdout_mode:
-        handle_stdout_output(audio_file)
-    else:
-        handle_file_output(ctx, audio_file, title)
+    return (
+        input_processor(ctx)
+        .bind(lambda result: 
+            Success(handle_stdout_output(result[1])) if ctx.config.stdout_mode
+            else handle_file_output(ctx, result[1], result[0])
+        )
+    )
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -367,18 +395,19 @@ def create_processing_context(config: Config) -> ProcessingContext:
     )
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     args = parse_arguments()
     validate_arguments(args)
-    
     config = create_config(args)
     ctx = create_processing_context(config)
-    
     check_ffmpeg(ctx.vprint)
     
     try:
-        process_audio(ctx)
+        result = process_audio(ctx)
+        if not is_successful(result):
+            print(f"Error: {result.failure()}", file=sys.stderr)
+            sys.exit(1)
     finally:
         shutil.rmtree(ctx.workdir, ignore_errors=True)
 
