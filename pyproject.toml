@@ -9,7 +9,7 @@ license = { text = "AGPL-3.0-or-later" }
 dependencies = ["faster-whisper==1.1.1", "yt-dlp==2025.5.22", "returns"]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-xdist"]
 
 [project.scripts]
 voxtus = "voxtus.__main__:main"
@@ -20,4 +20,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 python_files = "test_*.py"
-addopts = "-ra"
+addopts = "-ra --tb=short -n auto"

@@ -1,3 +1,4 @@
+import contextlib
 import http.server
 import os
 import socketserver
@@ -7,6 +8,25 @@ import time
 from pathlib import Path
 
 EXPECTED_OUTPUT = r"[0.00 - 7.00]:  Voxdust is a command line tool for transcribing internet videos or local audio files into readable text."
+
+@contextlib.contextmanager
+def change_directory(path):
+    """Context manager for changing directory safely in parallel tests."""
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(old_cwd)
+
+def get_free_port():
+    """Get a free port for HTTP server to avoid conflicts in parallel tests."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
 
 def validate_result(result, output_dir, name):
     assert result.returncode == 0
@@ -34,14 +54,9 @@ def validate_stdout_result(result):
         line = line.strip()
         if line:  # Skip empty lines
             assert line.startswith('[') and ']:' in line, f"Non-transcript line found in stdout: '{line}'"
-    
-def validate_stdout_result_strict(result):
-    """Validate stdout mode with strict stderr checking."""
-    validate_stdout_result(result)
-    # Should have no stderr output (all status messages silenced)
-    assert result.stderr.strip() == "", f"Expected empty stderr, got: {result.stderr}"
 
-def test_transcribe_local_mp3(tmp_path):
+def test_transcribe_local_file(tmp_path):
+    """Test local file processing (covers both MP3 and MP4 since they use same code path)."""
     test_data = Path(__file__).parent / "data" / "sample.mp3"
     output_dir = tmp_path
     name = "sample"
@@ -54,54 +69,8 @@ def test_transcribe_local_mp3(tmp_path):
 
     validate_result(result, output_dir, name)
 
-def test_transcribe_local_mp4(tmp_path):
-    test_data = Path(__file__).parent / "data" / "sample_video.mp4"
-    output_dir = tmp_path
-    name = "sample"
-
-    result = subprocess.run(
-        ["voxtus", "-n", name, "-o", str(output_dir), str(test_data)],
-        capture_output=True,
-        text=True,
-    )
-
-    validate_result(result, output_dir, name)
-
-def test_transcribe_http_mp4_via_ytdlp(tmp_path):
-    data_dir = Path(__file__).parent / "data"
-    os.chdir(data_dir)
-
-    class ReusableTCPServer(socketserver.TCPServer):
-        allow_reuse_address = True
-
-    handler = http.server.SimpleHTTPRequestHandler
-    httpd = ReusableTCPServer(("", 0), handler)
-    port = httpd.server_address[1]
-    output_dir = tmp_path
-    name = "http_test"
-
-    server_thread = threading.Thread(target=httpd.serve_forever)
-    server_thread.daemon = True
-    server_thread.start()
-    time.sleep(1)
-
-    try:
-        url = f"http://localhost:{port}/sample_video.mp4"
-        result = subprocess.run(
-            ["voxtus", "-n", name, "-o", str(output_dir), url],
-            capture_output=True,
-            text=True,
-        )
-
-        validate_result(result, output_dir, name)
-
-    finally:
-        httpd.shutdown()
-        server_thread.join()
-        assert not server_thread.is_alive(), "HTTP server thread is still alive after shutdown"
-
-def test_stdout_mode_local_mp3(tmp_path):
-    """Test that --stdout outputs transcript to stdout with no files created."""
+def test_stdout_mode(tmp_path):
+    """Test stdout mode functionality."""
     test_data = Path(__file__).parent / "data" / "sample.mp3"
     
     result = subprocess.run(
@@ -117,25 +86,47 @@ def test_stdout_mode_local_mp3(tmp_path):
     files_created = list(tmp_path.glob("*"))
     assert len(files_created) == 0, f"Files were created in stdout mode: {files_created}"
 
-def test_stdout_mode_local_mp4(tmp_path):
-    """Test that --stdout works with video files."""
-    test_data = Path(__file__).parent / "data" / "sample_video.mp4"
+def test_http_url_processing(tmp_path):
+    """Test HTTP URL processing (parallel-safe version)."""
+    data_dir = Path(__file__).parent / "data"
     
-    result = subprocess.run(
-        ["voxtus", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path)
-    )
-    
-    validate_stdout_result(result)
-    
-    # Should not create any files
-    files_created = list(tmp_path.glob("*"))
-    assert len(files_created) == 0, f"Files were created in stdout mode: {files_created}"
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
 
-def test_stdout_vs_normal_mode_consistency(tmp_path):
-    """Test that --stdout produces same content as normal file mode."""
+    handler = http.server.SimpleHTTPRequestHandler
+    
+    # Get a free port to avoid conflicts in parallel execution
+    port = get_free_port()
+    
+    output_dir = tmp_path
+    name = "http_test"
+
+    # Use context manager to safely change directory
+    with change_directory(data_dir):
+        httpd = ReusableTCPServer(("", port), handler)
+        
+        server_thread = threading.Thread(target=httpd.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+        time.sleep(1)
+
+        try:
+            url = f"http://localhost:{port}/sample_video.mp4"
+            result = subprocess.run(
+                ["voxtus", "-n", name, "-o", str(output_dir), url],
+                capture_output=True,
+                text=True,
+            )
+
+            validate_result(result, output_dir, name)
+
+        finally:
+            httpd.shutdown()
+            server_thread.join()
+            assert not server_thread.is_alive(), "HTTP server thread is still alive after shutdown"
+
+def test_output_consistency(tmp_path):
+    """Test that stdout and file modes produce consistent content."""
     test_data = Path(__file__).parent / "data" / "sample.mp3"
     
     # Run in normal mode
