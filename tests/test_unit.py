@@ -448,4 +448,138 @@ class TestParseArguments:
         assert args.keep is True
         assert args.force is True
         assert args.name == "short_name"
-        assert args.output == "/tmp/short" 
+        assert args.output == "/tmp/short"
+
+
+class TestTranscriptionProgress:
+    """Test transcription progress indicator behavior."""
+    
+    def test_progress_shown_in_normal_mode(self, tmp_path, capsys, monkeypatch):
+        """Test that progress is shown in normal (non-verbose) mode."""
+        from unittest.mock import Mock, patch
+
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+
+        # Mock WhisperModel and segments
+        mock_segment = Mock()
+        mock_segment.start = 0.0
+        mock_segment.end = 5.0
+        mock_segment.text = "Test transcription"
+        
+        mock_info = Mock()
+        mock_info.duration = 10.0
+        
+        mock_model = Mock()
+        mock_model.transcribe.return_value = ([mock_segment], mock_info)
+        
+        # Mock the WhisperModel constructor
+        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+            audio_file = tmp_path / "test.mp3"
+            audio_file.touch()  # Create empty file
+            output_file = tmp_path / "output.txt"
+            
+            vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
+            transcribe_to_file(audio_file, output_file, verbose=False, vprint_func=vprint)
+        
+        captured = capsys.readouterr()
+        # Progress should be shown to stderr
+        assert "📝 Transcribing... 100.0%" in captured.err
+        assert "(10.0s / 10.0s)" in captured.err
+    
+    def test_progress_suppressed_in_verbose_mode(self, tmp_path, capsys, monkeypatch):
+        """Test that progress is suppressed in verbose mode to avoid interference."""
+        from unittest.mock import Mock, patch
+
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+
+        # Mock WhisperModel and segments
+        mock_segment = Mock()
+        mock_segment.start = 0.0
+        mock_segment.end = 5.0
+        mock_segment.text = "Test transcription"
+        
+        mock_info = Mock()
+        mock_info.duration = 10.0
+        
+        mock_model = Mock()
+        mock_model.transcribe.return_value = ([mock_segment], mock_info)
+        
+        # Mock the WhisperModel constructor
+        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+            audio_file = tmp_path / "test.mp3"
+            audio_file.touch()  # Create empty file
+            output_file = tmp_path / "output.txt"
+            
+            vprint = create_print_wrapper(verbose_level=1, stdout_mode=False)
+            transcribe_to_file(audio_file, output_file, verbose=True, vprint_func=vprint)
+        
+        captured = capsys.readouterr()
+        # Progress should NOT be shown in verbose mode
+        assert "📝 Transcribing..." not in captured.err or "%" not in captured.err
+        # But transcript line should be shown
+        assert "Test transcription" in captured.err
+    
+    def test_progress_with_multiple_segments(self, tmp_path, capsys):
+        """Test progress updates with multiple segments."""
+        from unittest.mock import Mock, patch
+
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+
+        # Mock multiple segments
+        segments = []
+        for i, end_time in enumerate([2.0, 4.0, 6.0, 8.0, 10.0]):
+            segment = Mock()
+            segment.start = i * 2.0
+            segment.end = end_time
+            segment.text = f"Segment {i+1}"
+            segments.append(segment)
+        
+        mock_info = Mock()
+        mock_info.duration = 10.0
+        
+        mock_model = Mock()
+        mock_model.transcribe.return_value = (segments, mock_info)
+        
+        # Mock the WhisperModel constructor
+        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+            audio_file = tmp_path / "test.mp3"
+            audio_file.touch()
+            output_file = tmp_path / "output.txt"
+            
+            vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
+            transcribe_to_file(audio_file, output_file, verbose=False, vprint_func=vprint)
+        
+        captured = capsys.readouterr()
+        # Should show final 100% completion
+        assert "📝 Transcribing... 100.0% (10.0s / 10.0s)" in captured.err
+    
+    def test_stdout_mode_remains_quiet(self, tmp_path, capsys):
+        """Test that stdout mode produces no progress messages."""
+        from unittest.mock import Mock, patch
+
+        from voxtus.__main__ import transcribe_to_stdout
+
+        # Mock WhisperModel and segments
+        mock_segment = Mock()
+        mock_segment.start = 0.0
+        mock_segment.end = 5.0
+        mock_segment.text = "Test transcription"
+        
+        mock_info = Mock()
+        mock_info.duration = 10.0
+        
+        mock_model = Mock()
+        mock_model.transcribe.return_value = ([mock_segment], mock_info)
+        
+        # Mock the WhisperModel constructor
+        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+            audio_file = tmp_path / "test.mp3"
+            audio_file.touch()
+            
+            transcribe_to_stdout(audio_file)
+        
+        captured = capsys.readouterr()
+        # Stdout should only contain transcript
+        assert captured.out.strip() == "[0.00 - 5.00]: Test transcription"
+        # Stderr should be empty (no progress messages)
+        assert captured.err == "" 

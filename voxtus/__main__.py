@@ -141,14 +141,28 @@ def transcribe_to_file(audio_file: Path, output_file: Path, verbose: bool, vprin
     """Transcribe audio to a file."""
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
     model = WhisperModel("base", compute_type="auto")
-    segments, _ = model.transcribe(str(audio_file))
+    segments, info = model.transcribe(str(audio_file))
 
+    vprint_func("🎤 Starting transcription...")
+    total_duration = info.duration if hasattr(info, 'duration') else None
+    
     with output_file.open("w", encoding="utf-8") as f:
         for segment in segments:
             line = format_transcript_line(segment)
             f.write(line + "\n")
+            
+            # Show progress based on segment timing (but not in verbose mode to avoid interference)
+            if not verbose and total_duration and segment.end > 0:
+                progress_percent = min(100, (segment.end / total_duration) * 100)
+                # Use \r to overwrite the same line instead of creating new lines
+                print(f"\r📝 Transcribing... {progress_percent:.1f}% ({segment.end:.1f}s / {total_duration:.1f}s)", end="", file=sys.stderr)
+            
             if verbose:
                 vprint_func(line, 1)
+        
+        # Ensure we show 100% completion at the end (only if we were showing progress)
+        if not verbose and total_duration:
+            print(f"\r📝 Transcribing... 100.0% ({total_duration:.1f}s / {total_duration:.1f}s)", file=sys.stderr)
 
 
 def transcribe_to_stdout(audio_file: Path):
