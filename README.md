@@ -51,6 +51,53 @@ voxtus --help
 
 ---
 
+## 🧪 Development Setup
+
+### Quick Start for Contributors
+
+```bash
+git clone https://github.com/johanthoren/voxtus.git
+cd voxtus
+
+# Install uv (fast Python package manager)
+brew install uv         # macOS
+# or: pip install uv    # any platform
+
+# Setup development environment
+make dev-install
+
+# Run tests
+make test
+```
+
+### Development Workflow
+
+The project uses a simple Makefile for development tasks:
+
+```bash
+make help              # Show all available commands
+make install           # Install package and dependencies
+make dev-install       # Install with development dependencies
+make test              # Run tests
+make test-coverage     # Run tests with coverage report
+
+# Release (bumps version, commits, tags, and pushes)
+make release           # Patch release (0.1.9 -> 0.1.10)
+make release patch     # Patch release (0.1.9 -> 0.1.10)
+make release minor     # Minor release (0.1.9 -> 0.2.0)
+make release major     # Major release (0.1.9 -> 1.0.0)
+```
+
+The release process automatically:
+1. Checks that working directory is clean
+2. Runs tests
+3. Bumps the version in `pyproject.toml`
+4. Commits the version change
+5. Creates a git tag
+6. Pushes commit and tag to trigger GitHub Actions CI/CD
+
+---
+
 ### 🧪 For contributors / running from source
 
 ```bash
