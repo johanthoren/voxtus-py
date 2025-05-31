@@ -86,4 +86,4 @@ def write_format_to_stdout(format_name: str, segments: List[Any], info: Any) -> 
 
 
 # Auto-import format modules to register them
-from . import json, txt
+from . import json, srt, txt

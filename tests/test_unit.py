@@ -661,6 +661,22 @@ class TestFormatSelection:
         
         formats = parse_and_validate_formats("json", stdout_mode=True)
         assert formats == ["json"]
+    
+    def test_srt_format_validation(self):
+        """Test that SRT format is properly validated."""
+        from voxtus.__main__ import parse_and_validate_formats
+
+        # Test SRT as single format
+        formats = parse_and_validate_formats("srt", stdout_mode=False)
+        assert formats == ["srt"]
+        
+        # Test SRT with other formats
+        formats = parse_and_validate_formats("txt,srt,json", stdout_mode=False)
+        assert formats == ["txt", "srt", "json"]
+        
+        # Test SRT with stdout
+        formats = parse_and_validate_formats("srt", stdout_mode=True)
+        assert formats == ["srt"]
 
 
 class TestJSONFormat:
@@ -784,4 +800,224 @@ class TestFormatArguments:
         from voxtus.__main__ import create_config
         config = create_config(args)
         
-        assert config.formats == ["txt"] 
+        assert config.formats == ["txt"]
+    
+    def test_format_argument_with_srt(self, tmp_path):
+        """Test that SRT format is properly parsed into config."""
+        args = argparse.Namespace(
+            input="test.mp3",
+            verbose=0,
+            keep=False,
+            overwrite=False,
+            format="txt,json,srt",
+            name=None,
+            output=str(tmp_path),
+            stdout=False
+        )
+        
+        from voxtus.__main__ import create_config
+        config = create_config(args)
+        
+        assert config.formats == ["txt", "json", "srt"]
+    
+    def test_srt_single_format(self, tmp_path):
+        """Test that SRT format works as single format."""
+        args = argparse.Namespace(
+            input="test.mp3",
+            verbose=0,
+            keep=False,
+            overwrite=False,
+            format="srt",
+            name=None,
+            output=str(tmp_path),
+            stdout=False
+        )
+        
+        from voxtus.__main__ import create_config
+        config = create_config(args)
+        
+        assert config.formats == ["srt"]
+
+
+class TestSRTFormat:
+    """Test SRT format functionality."""
+    
+    def test_srt_timestamp_formatting(self):
+        """Test SRT timestamp formatting function."""
+        from voxtus.formats.srt import format_timestamp
+
+        # Test basic timestamp
+        assert format_timestamp(0.0) == "00:00:00,000"
+        assert format_timestamp(65.5) == "00:01:05,500"
+        assert format_timestamp(3661.123) == "01:01:01,123"
+        
+        # Test edge cases
+        assert format_timestamp(0.999) == "00:00:00,999"
+        assert format_timestamp(3599.999) == "00:59:59,999"
+        assert format_timestamp(7200.0) == "02:00:00,000"
+    
+    def test_srt_segment_formatting(self):
+        """Test SRT segment formatting function."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.srt import format_srt_segment
+
+        # Mock segment
+        segment = Mock()
+        segment.start = 0.0
+        segment.end = 5.2
+        segment.text = "Hello world"
+        
+        result = format_srt_segment(segment, 1)
+        expected = "1\n00:00:00,000 --> 00:00:05,200\nHello world\n"
+        assert result == expected
+    
+    def test_srt_segment_with_whitespace(self):
+        """Test SRT segment formatting strips whitespace."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.srt import format_srt_segment
+
+        # Mock segment with leading/trailing whitespace
+        segment = Mock()
+        segment.start = 10.5
+        segment.end = 15.75
+        segment.text = "  Text with spaces  "
+        
+        result = format_srt_segment(segment, 42)
+        expected = "42\n00:00:10,500 --> 00:00:15,750\nText with spaces\n"
+        assert result == expected
+    
+    def test_srt_format_structure(self, tmp_path):
+        """Test SRT format output structure."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segments
+        segments = []
+        for i in range(3):
+            segment = Mock()
+            segment.start = i * 2.0
+            segment.end = (i + 1) * 2.0
+            segment.text = f"Subtitle {i + 1}"
+            segments.append(segment)
+        
+        output_file = tmp_path / "test.srt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("srt", segments, output_file, "Test Title", "test.mp4", None, False, vprint)
+        
+        # Read the file
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        # Verify SRT structure
+        expected_content = (
+            "1\n00:00:00,000 --> 00:00:02,000\nSubtitle 1\n\n"
+            "2\n00:00:02,000 --> 00:00:04,000\nSubtitle 2\n\n"
+            "3\n00:00:04,000 --> 00:00:06,000\nSubtitle 3\n\n"
+        )
+        assert content == expected_content
+    
+    def test_srt_format_with_long_duration(self, tmp_path):
+        """Test SRT format with timestamps over an hour."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segment with long duration
+        segment = Mock()
+        segment.start = 3661.5  # 1 hour, 1 minute, 1.5 seconds
+        segment.end = 3665.0    # 1 hour, 1 minute, 5 seconds
+        segment.text = "Long duration subtitle"
+        
+        output_file = tmp_path / "test_long.srt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint)
+        
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        expected_content = (
+            "1\n01:01:01,500 --> 01:01:05,000\nLong duration subtitle\n\n"
+        )
+        assert content == expected_content
+    
+    def test_srt_format_stdout(self, capsys):
+        """Test SRT format stdout output."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format_to_stdout
+
+        # Mock segments
+        segments = []
+        for i in range(2):
+            segment = Mock()
+            segment.start = i * 1.5
+            segment.end = (i + 1) * 1.5
+            segment.text = f"Line {i + 1}"
+            segments.append(segment)
+        
+        write_format_to_stdout("srt", segments, None)
+        
+        captured = capsys.readouterr()
+        expected_output = (
+            "1\n00:00:00,000 --> 00:00:01,500\nLine 1\n\n"
+            "2\n00:00:01,500 --> 00:00:03,000\nLine 2\n\n"
+        )
+        assert captured.out == expected_output
+    
+    def test_srt_format_with_unicode(self, tmp_path):
+        """Test SRT format handles Unicode characters properly."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segment with Unicode characters
+        segment = Mock()
+        segment.start = 0.0
+        segment.end = 3.0
+        segment.text = "Café résumé naïve 中文 🎵"
+        
+        output_file = tmp_path / "test_unicode.srt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint)
+        
+        # Read with explicit UTF-8 encoding
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        assert "Café résumé naïve 中文 🎵" in content
+        assert content.startswith("1\n00:00:00,000 --> 00:00:03,000\nCafé résumé naïve 中文 🎵\n")
+    
+    def test_srt_format_verbose_logging(self, tmp_path):
+        """Test SRT format verbose logging."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segments
+        segments = []
+        for i in range(2):
+            segment = Mock()
+            segment.start = i * 1.0
+            segment.end = (i + 1) * 1.0
+            segment.text = f"Segment {i + 1}"
+            segments.append(segment)
+        
+        # Mock vprint function to capture calls
+        vprint_calls = []
+        def mock_vprint(msg, level=0):
+            vprint_calls.append((msg, level))
+        
+        output_file = tmp_path / "test_verbose.srt"
+        
+        write_format("srt", segments, output_file, "Test", "test.mp4", None, True, mock_vprint)
+        
+        # Check that verbose messages were logged
+        assert any("SRT segment 1: 0.00s - 1.00s" in call[0] for call in vprint_calls)
+        assert any("SRT segment 2: 1.00s - 2.00s" in call[0] for call in vprint_calls)
+        assert any("SRT format written with 2 subtitle segments" in call[0] for call in vprint_calls) 

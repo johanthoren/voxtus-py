@@ -8,7 +8,7 @@ It supports multiple output formats and can download, transcribe, and optionally
 
 - 🎥 **Download & transcribe** videos from YouTube, Vimeo, and 1000+ sites
 - 📁 **Local file support** for audio/video files  
-- 📝 **Multiple output formats**: TXT, JSON
+- 📝 **Multiple output formats**: TXT, JSON, SRT
 - 🔄 **Batch processing** multiple formats in one run
 - 📊 **Rich metadata** in JSON format (title, source, duration, language)
 - 🚀 **Stdout mode** for pipeline integration
@@ -149,8 +149,9 @@ voxtus --help
 |--------|-------------|----------|
 | **TXT** | Plain text with timestamps | Default, LLM processing, reading |
 | **JSON** | Structured data with metadata | APIs, data analysis, archival |
+| **SRT** | SubRip subtitle format | Video subtitles, media players |
 
-*Additional formats (SRT, VTT, CSV) are planned for future releases.*
+*Additional formats (VTT, CSV) are planned for future releases.*
 
 ### 🔧 Extensible Format System
 
@@ -177,7 +178,10 @@ voxtus recording.mp3
 voxtus video.mp4 -f json
 
 # Multiple formats at once
-voxtus video.mp4 -f txt,json
+voxtus video.mp4 -f txt,json,srt
+
+# SRT format for video subtitles
+voxtus video.mp4 -f srt
 ```
 
 ### Advanced Usage
@@ -215,7 +219,7 @@ voxtus interview.mp4 -f txt,json -n "interview_2024"
 
 | Option | Description |
 |--------|-------------|
-| `-f`, `--format FORMAT` | Output format(s): txt, json (comma-separated) |
+| `-f`, `--format FORMAT` | Output format(s): txt, json, srt (comma-separated) |
 | `-n, --name NAME` | Base name for output files (no extension) |
 | `-o, --output DIR` | Output directory (default: current directory) |
 | `-v, --verbose` | Increase verbosity (-v, -vv for debug) |
