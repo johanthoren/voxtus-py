@@ -218,7 +218,8 @@ class TestCreateConfig:
             input="test.mp3",
             verbose=1,
             keep=False,
-            force=False,
+            overwrite=False,
+            format="txt",
             name=None,
             output=str(tmp_path),
             stdout=False
@@ -229,10 +230,11 @@ class TestCreateConfig:
         assert config.input_path == "test.mp3"
         assert config.verbose_level == 1
         assert config.keep_audio is False
-        assert config.force_overwrite is False
+        assert config.overwrite_files is False
         assert config.custom_name is None
         assert config.output_dir == tmp_path
         assert config.stdout_mode is False
+        assert config.formats == ["txt"]
     
     def test_config_with_custom_name(self, tmp_path):
         """Test config creation with custom name."""
@@ -240,7 +242,8 @@ class TestCreateConfig:
             input="test.mp3",
             verbose=0,
             keep=True,
-            force=True,
+            overwrite=True,
+            format="json",
             name="my_custom_name",
             output=str(tmp_path),
             stdout=True
@@ -250,8 +253,9 @@ class TestCreateConfig:
         
         assert config.custom_name == "my_custom_name"
         assert config.keep_audio is True
-        assert config.force_overwrite is True
+        assert config.overwrite_files is True
         assert config.stdout_mode is True
+        assert config.formats == ["json"]
     
     def test_config_strips_txt_extension_from_name(self, tmp_path):
         """Test that .txt extension is stripped from custom name."""
@@ -259,7 +263,8 @@ class TestCreateConfig:
             input="test.mp3",
             verbose=0,
             keep=False,
-            force=False,
+            overwrite=False,
+            format="txt",
             name="my_file.txt",
             output=str(tmp_path),
             stdout=False
@@ -274,7 +279,8 @@ class TestCreateConfig:
             input="test.mp3",
             verbose=0,
             keep=False,
-            force=False,
+            overwrite=False,
+            format="txt",
             name=None,
             output=None,
             stdout=False
@@ -292,7 +298,8 @@ class TestCreateConfig:
             input="test.mp3",
             verbose=0,
             keep=False,
-            force=False,
+            overwrite=False,
+            format="txt",
             name=None,
             output=user_path,
             stdout=False
@@ -313,10 +320,11 @@ class TestCreateProcessingContext:
             input_path="https://example.com/video.mp4",
             verbose_level=1,
             keep_audio=False,
-            force_overwrite=False,
+            overwrite_files=False,
             custom_name=None,
             output_dir=tmp_path,
-            stdout_mode=False
+            stdout_mode=False,
+            formats=["txt"]
         )
         
         ctx = create_processing_context(config)
@@ -335,10 +343,11 @@ class TestCreateProcessingContext:
             input_path="/path/to/file.mp3",
             verbose_level=2,
             keep_audio=True,
-            force_overwrite=True,
+            overwrite_files=True,
             custom_name="test",
             output_dir=tmp_path,
-            stdout_mode=True
+            stdout_mode=True,
+            formats=["json"]
         )
         
         ctx = create_processing_context(config)
@@ -357,10 +366,11 @@ class TestCreateProcessingContext:
             input_path="test.mp3",
             verbose_level=0,
             keep_audio=False,
-            force_overwrite=False,
+            overwrite_files=False,
             custom_name=None,
             output_dir=tmp_path,
-            stdout_mode=False
+            stdout_mode=False,
+            formats=["txt"]
         )
         
         ctx1 = create_processing_context(config)
@@ -374,10 +384,11 @@ class TestCreateProcessingContext:
             input_path="test.mp3",
             verbose_level=0,
             keep_audio=False,
-            force_overwrite=False,
+            overwrite_files=False,
             custom_name=None,
             output_dir=tmp_path,
-            stdout_mode=False
+            stdout_mode=False,
+            formats=["txt"]
         )
         
         ctx1 = create_processing_context(config)
@@ -401,7 +412,8 @@ class TestParseArguments:
         assert args.input == "test.mp3"
         assert args.verbose == 0
         assert args.keep is False
-        assert args.force is False
+        assert args.overwrite is False
+        assert args.format == "txt"  # default format
         assert args.name is None
         assert args.output is None
         assert args.stdout is False
@@ -412,7 +424,8 @@ class TestParseArguments:
             "voxtus", "test.mp3",
             "-v", "-v",  # -vv for debug
             "--keep",
-            "--force", 
+            "--overwrite", 
+            "--format", "json",
             "--name", "custom_name",
             "--output", "/tmp/output",
             "--stdout"
@@ -424,7 +437,8 @@ class TestParseArguments:
         assert args.input == "test.mp3"
         assert args.verbose == 2  # -vv
         assert args.keep is True
-        assert args.force is True
+        assert args.overwrite is True
+        assert args.format == "json"
         assert args.name == "custom_name"
         assert args.output == "/tmp/output"
         assert args.stdout is True
@@ -435,7 +449,7 @@ class TestParseArguments:
             "voxtus", "test.mp3",
             "-v",
             "-k",
-            "-f",
+            "-f", "txt,json",
             "-n", "short_name",
             "-o", "/tmp/short"
         ]
@@ -446,7 +460,7 @@ class TestParseArguments:
         assert args.input == "test.mp3"
         assert args.verbose == 1
         assert args.keep is True
-        assert args.force is True
+        assert args.format == "txt,json"
         assert args.name == "short_name"
         assert args.output == "/tmp/short"
 
@@ -458,7 +472,7 @@ class TestTranscriptionProgress:
         """Test that progress is shown in normal (non-verbose) mode."""
         from unittest.mock import Mock, patch
 
-        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_formats
 
         # Mock WhisperModel and segments
         mock_segment = Mock()
@@ -476,10 +490,10 @@ class TestTranscriptionProgress:
         with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()  # Create empty file
-            output_file = tmp_path / "output.txt"
+            base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
-            transcribe_to_file(audio_file, output_file, verbose=False, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Progress should be shown to stderr
@@ -490,7 +504,7 @@ class TestTranscriptionProgress:
         """Test that progress is suppressed in verbose mode to avoid interference."""
         from unittest.mock import Mock, patch
 
-        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_formats
 
         # Mock WhisperModel and segments
         mock_segment = Mock()
@@ -508,10 +522,10 @@ class TestTranscriptionProgress:
         with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()  # Create empty file
-            output_file = tmp_path / "output.txt"
+            base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=1, stdout_mode=False)
-            transcribe_to_file(audio_file, output_file, verbose=True, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=True, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Progress should NOT be shown in verbose mode
@@ -523,7 +537,7 @@ class TestTranscriptionProgress:
         """Test progress updates with multiple segments."""
         from unittest.mock import Mock, patch
 
-        from voxtus.__main__ import create_print_wrapper, transcribe_to_file
+        from voxtus.__main__ import create_print_wrapper, transcribe_to_formats
 
         # Mock multiple segments
         segments = []
@@ -544,10 +558,10 @@ class TestTranscriptionProgress:
         with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
-            output_file = tmp_path / "output.txt"
+            base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
-            transcribe_to_file(audio_file, output_file, verbose=False, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Should show final 100% completion
@@ -576,10 +590,198 @@ class TestTranscriptionProgress:
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
             
-            transcribe_to_stdout(audio_file)
+            transcribe_to_stdout(audio_file, "txt")
         
         captured = capsys.readouterr()
         # Stdout should only contain transcript
         assert captured.out.strip() == "[0.00 - 5.00]: Test transcription"
         # Stderr should be empty (no progress messages)
-        assert captured.err == "" 
+        assert captured.err == ""
+
+
+class TestFormatSelection:
+    """Test format selection and validation functionality."""
+    
+    def test_parse_single_format(self):
+        """Test parsing a single format."""
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        formats = parse_and_validate_formats("txt", stdout_mode=False)
+        assert formats == ["txt"]
+    
+    def test_parse_multiple_formats(self):
+        """Test parsing multiple comma-separated formats."""
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        formats = parse_and_validate_formats("txt,json,srt", stdout_mode=False)
+        assert formats == ["txt", "json", "srt"]
+    
+    def test_parse_formats_with_spaces(self):
+        """Test parsing formats with spaces around commas."""
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        formats = parse_and_validate_formats("txt, json , srt", stdout_mode=False)
+        assert formats == ["txt", "json", "srt"]
+    
+    def test_parse_formats_case_insensitive(self):
+        """Test that format parsing is case insensitive."""
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        formats = parse_and_validate_formats("TXT,JSON", stdout_mode=False)
+        assert formats == ["txt", "json"]
+    
+    def test_invalid_format_raises_exit(self, capsys):
+        """Test that invalid formats cause system exit."""
+        import pytest
+
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        with pytest.raises(SystemExit):
+            parse_and_validate_formats("invalid", stdout_mode=False)
+        
+        captured = capsys.readouterr()
+        assert "Invalid format(s): invalid" in captured.err
+        assert "Supported formats:" in captured.err
+    
+    def test_multiple_formats_with_stdout_raises_exit(self, capsys):
+        """Test that multiple formats with stdout mode cause system exit."""
+        import pytest
+
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        with pytest.raises(SystemExit):
+            parse_and_validate_formats("txt,json", stdout_mode=True)
+        
+        captured = capsys.readouterr()
+        assert "Only one format allowed when using --stdout" in captured.err
+    
+    def test_single_format_with_stdout_allowed(self):
+        """Test that single format with stdout mode is allowed."""
+        from voxtus.__main__ import parse_and_validate_formats
+        
+        formats = parse_and_validate_formats("json", stdout_mode=True)
+        assert formats == ["json"]
+
+
+class TestJSONFormat:
+    """Test JSON format functionality."""
+    
+    def test_json_format_structure(self, tmp_path):
+        """Test JSON format output structure."""
+        import json
+        from unittest.mock import Mock
+
+        from voxtus.__main__ import write_json_format
+
+        # Mock segments
+        segments = []
+        for i in range(3):
+            segment = Mock()
+            segment.start = i * 2.0
+            segment.end = (i + 1) * 2.0
+            segment.text = f"Segment {i + 1} text"
+            segments.append(segment)
+        
+        # Mock info
+        mock_info = Mock()
+        mock_info.duration = 6.0
+        mock_info.language = "en"
+        
+        output_file = tmp_path / "test.json"
+        vprint = lambda msg, level=0: None
+        
+        write_json_format(segments, output_file, "Test Title", "test.mp3", mock_info, False, vprint)
+        
+        # Read and parse the JSON
+        with open(output_file) as f:
+            data = json.load(f)
+        
+        # Verify structure
+        assert "transcript" in data
+        assert "metadata" in data
+        
+        # Verify transcript
+        assert len(data["transcript"]) == 3
+        for i, segment in enumerate(data["transcript"]):
+            assert segment["id"] == i + 1
+            assert segment["start"] == i * 2.0
+            assert segment["end"] == (i + 1) * 2.0
+            assert segment["text"] == f"Segment {i + 1} text"
+        
+        # Verify metadata
+        metadata = data["metadata"]
+        assert metadata["title"] == "Test Title"
+        assert metadata["source"] == "test.mp3"
+        assert metadata["duration"] == 6.0
+        assert metadata["model"] == "base"
+        assert metadata["language"] == "en"
+    
+    def test_txt_format_structure(self, tmp_path):
+        """Test TXT format output structure."""
+        from unittest.mock import Mock
+
+        from voxtus.__main__ import write_txt_format
+
+        # Mock segments
+        segments = []
+        for i in range(2):
+            segment = Mock()
+            segment.start = i * 3.0
+            segment.end = (i + 1) * 3.0
+            segment.text = f"Text segment {i + 1}"
+            segments.append(segment)
+        
+        output_file = tmp_path / "test.txt"
+        vprint = lambda msg, level=0: None
+        
+        write_txt_format(segments, output_file, False, vprint)
+        
+        # Read the file
+        with open(output_file) as f:
+            content = f.read()
+        
+        # Verify content
+        lines = content.strip().split('\n')
+        assert len(lines) == 2
+        assert lines[0] == "[0.00 - 3.00]: Text segment 1"
+        assert lines[1] == "[3.00 - 6.00]: Text segment 2"
+
+
+class TestFormatArguments:
+    """Test format argument integration."""
+    
+    def test_format_argument_in_config(self, tmp_path):
+        """Test that format argument is properly parsed into config."""
+        args = argparse.Namespace(
+            input="test.mp3",
+            verbose=0,
+            keep=False,
+            overwrite=False,
+            format="txt,json",
+            name=None,
+            output=str(tmp_path),
+            stdout=False
+        )
+        
+        from voxtus.__main__ import create_config
+        config = create_config(args)
+        
+        assert config.formats == ["txt", "json"]
+    
+    def test_default_format_is_txt(self, tmp_path):
+        """Test that default format is txt."""
+        args = argparse.Namespace(
+            input="test.mp3",
+            verbose=0,
+            keep=False,
+            overwrite=False,
+            format="txt",  # This is the default from argparse
+            name=None,
+            output=str(tmp_path),
+            stdout=False
+        )
+        
+        from voxtus.__main__ import create_config
+        config = create_config(args)
+        
+        assert config.formats == ["txt"] 

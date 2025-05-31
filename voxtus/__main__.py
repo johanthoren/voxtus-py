@@ -3,11 +3,31 @@ Voxtus: Transcribe Internet videos and media files to text using faster-whisper.
 
 This CLI tool supports:
 - Downloading media from the Internet via the yt_dlp library
-- Converting local media files to mp3 format
+- Processing local media files (audio/video formats)
 - Transcribing using the Whisper model via faster-whisper
-- Saving transcripts in .txt format
+- Multiple output formats: TXT, JSON
+- Rich metadata in JSON format
+- Multiple format output in a single run
 - Optional verbose output and audio retention
 - Output directory customization
+- Stdout mode for pipeline integration
+
+Output Formats:
+- TXT: Plain text with timestamps (default, LLM-friendly)
+- JSON: Structured data with metadata (title, source, duration, etc.)
+
+Examples:
+    # Basic transcription (default TXT format)
+    voxtus video.mp4
+
+    # Multiple formats
+    voxtus video.mp4 -f txt,json
+
+    # JSON format to stdout for processing
+    voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
+
+    # Custom output name and directory
+    voxtus video.mp4 -f json -n "my_transcript" -o ~/transcripts
 
 Author: Johan Thorén
 License: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -48,10 +68,11 @@ __version__ = importlib.metadata.version("voxtus")
 class Config:
     """Configuration for the transcription process."""
     custom_name: Optional[str]
-    force_overwrite: bool
+    formats: list[str]
     input_path: str
     keep_audio: bool
     output_dir: Path
+    overwrite_files: bool
     stdout_mode: bool
     verbose_level: int
 
@@ -137,8 +158,48 @@ def format_transcript_line(segment) -> str:
     return f"[{segment.start:.2f} - {segment.end:.2f}]: {segment.text}"
 
 
-def transcribe_to_file(audio_file: Path, output_file: Path, verbose: bool, vprint_func: Callable[[str, int], None]):
-    """Transcribe audio to a file."""
+def write_txt_format(segments, output_file: Path, verbose: bool, vprint_func: Callable[[str, int], None]):
+    """Write transcript in TXT format."""
+    with output_file.open("w", encoding="utf-8") as f:
+        for segment in segments:
+            line = format_transcript_line(segment)
+            f.write(line + "\n")
+            if verbose:
+                vprint_func(line, 1)
+
+
+def write_json_format(segments, output_file: Path, title: str, source: str, info, verbose: bool, vprint_func: Callable[[str, int], None]):
+    """Write transcript in JSON format with metadata."""
+    import json
+    
+    transcript_data = {
+        "transcript": [
+            {
+                "id": i + 1,
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text
+            }
+            for i, segment in enumerate(segments)
+        ],
+        "metadata": {
+            "title": title,
+            "source": source,
+            "duration": info.duration if hasattr(info, 'duration') else None,
+            "model": "base",
+            "language": info.language if hasattr(info, 'language') else "en"
+        }
+    }
+    
+    with output_file.open("w", encoding="utf-8") as f:
+        json.dump(transcript_data, f, indent=2, ensure_ascii=False)
+    
+    if verbose:
+        vprint_func(f"JSON format written with {len(transcript_data['transcript'])} segments", 1)
+
+
+def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, vprint_func: Callable[[str, int], None]) -> list[Path]:
+    """Transcribe audio to multiple formats."""
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
     model = WhisperModel("base", compute_type="auto")
     segments, info = model.transcribe(str(audio_file))
@@ -146,33 +207,68 @@ def transcribe_to_file(audio_file: Path, output_file: Path, verbose: bool, vprin
     vprint_func("🎤 Starting transcription...")
     total_duration = info.duration if hasattr(info, 'duration') else None
     
-    with output_file.open("w", encoding="utf-8") as f:
-        for segment in segments:
-            line = format_transcript_line(segment)
-            f.write(line + "\n")
-            
-            # Show progress based on segment timing (but not in verbose mode to avoid interference)
-            if not verbose and total_duration and segment.end > 0:
-                progress_percent = min(100, (segment.end / total_duration) * 100)
-                # Use \r to overwrite the same line instead of creating new lines
-                print(f"\r📝 Transcribing... {progress_percent:.1f}% ({segment.end:.1f}s / {total_duration:.1f}s)", end="", file=sys.stderr)
-            
-            if verbose:
-                vprint_func(line, 1)
-        
-        # Ensure we show 100% completion at the end (only if we were showing progress)
-        if not verbose and total_duration:
-            print(f"\r📝 Transcribing... 100.0% ({total_duration:.1f}s / {total_duration:.1f}s)", file=sys.stderr)
-
-
-def transcribe_to_stdout(audio_file: Path):
-    """Transcribe audio directly to stdout."""
-    model = WhisperModel("base", compute_type="auto")
-    segments, _ = model.transcribe(str(audio_file))
-
+    # Collect all segments for format writers
+    segments_list = []
     for segment in segments:
-        line = format_transcript_line(segment)
-        print(line)
+        segments_list.append(segment)
+        
+        # Show progress based on segment timing (but not in verbose mode to avoid interference)
+        if not verbose and total_duration and segment.end > 0:
+            progress_percent = min(100, (segment.end / total_duration) * 100)
+            # Use \r to overwrite the same line instead of creating new lines
+            print(f"\r📝 Transcribing... {progress_percent:.1f}% ({segment.end:.1f}s / {total_duration:.1f}s)", end="", file=sys.stderr)
+    
+    # Ensure we show 100% completion at the end (only if we were showing progress)
+    if not verbose and total_duration:
+        print(f"\r📝 Transcribing... 100.0% ({total_duration:.1f}s / {total_duration:.1f}s)", file=sys.stderr)
+    
+    # Write all requested formats
+    output_files = []
+    for fmt in formats:
+        output_file = base_output_path.with_suffix(f".{fmt}")
+        
+        if fmt == "txt":
+            write_txt_format(segments_list, output_file, verbose, vprint_func)
+        elif fmt == "json":
+            write_json_format(segments_list, output_file, title, source, info, verbose, vprint_func)
+        
+        output_files.append(output_file)
+    
+    return output_files
+
+
+def transcribe_to_stdout(audio_file: Path, format_type: str):
+    """Transcribe audio directly to stdout in specified format."""
+    model = WhisperModel("base", compute_type="auto")
+    segments, info = model.transcribe(str(audio_file))
+
+    segments_list = list(segments)
+    
+    if format_type == "txt":
+        for segment in segments_list:
+            line = format_transcript_line(segment)
+            print(line)
+    elif format_type == "json":
+        import json
+        transcript_data = {
+            "transcript": [
+                {
+                    "id": i + 1,
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text
+                }
+                for i, segment in enumerate(segments_list)
+            ],
+            "metadata": {
+                "title": "unknown",
+                "source": "unknown", 
+                "duration": info.duration if hasattr(info, 'duration') else None,
+                "model": "base",
+                "language": info.language if hasattr(info, 'language') else "en"
+            }
+        }
+        print(json.dumps(transcript_data, indent=2, ensure_ascii=False))
 
 
 def check_ffmpeg(vprint_func: Callable[[str, int], None]):
@@ -281,25 +377,36 @@ def get_final_name(title: str, custom_name: Optional[str]) -> str:
 
 
 @safe
-def check_file_overwrite(final_transcript: Path, force_overwrite: bool) -> None:
+def check_file_overwrite(final_transcript: Path, overwrite_files: bool) -> None:
     """Check if file should be overwritten and handle user confirmation."""
-    if final_transcript.exists() and not force_overwrite:
+    if final_transcript.exists() and not overwrite_files:
         response = input(f"⚠️ Transcript file '{final_transcript}' already exists. Overwrite? [y/N] ").lower()
         if response != 'y':
             raise ValueError("User aborted")
 
 
-def create_transcript_file(audio_file: Path, ctx: ProcessingContext) -> Path:
-    """Create transcript file."""
-    transcript_file = audio_file.with_suffix(".txt")
-    transcribe_to_file(audio_file, transcript_file, ctx.config.verbose_level >= 1, ctx.vprint)
-    return transcript_file
+def create_transcript_file(audio_file: Path, ctx: ProcessingContext, title: str) -> list[Path]:
+    """Create transcript files in all requested formats."""
+    base_name = audio_file.with_suffix("")
+    return transcribe_to_formats(
+        audio_file, 
+        base_name, 
+        ctx.config.formats, 
+        title, 
+        ctx.config.input_path, 
+        ctx.config.verbose_level >= 1, 
+        ctx.vprint
+    )
 
 
-def move_files_and_log(ctx: ProcessingContext, audio_file: Path, transcript_file: Path, final_name: str) -> None:
-    """Handle file moving and logging."""
-    final_transcript = ctx.config.output_dir / f"{final_name}.txt"
-    shutil.move(str(transcript_file), final_transcript)
+def move_files_and_log(ctx: ProcessingContext, audio_file: Path, transcript_files: list[Path], final_name: str) -> None:
+    """Handle file moving and logging for multiple format files."""
+    # Move all transcript files
+    final_files = []
+    for transcript_file in transcript_files:
+        final_transcript = ctx.config.output_dir / f"{final_name}{transcript_file.suffix}"
+        shutil.move(str(transcript_file), final_transcript)
+        final_files.append(final_transcript)
     
     if ctx.config.keep_audio:
         final_audio = ctx.config.output_dir / f"{final_name}.mp3"
@@ -308,34 +415,39 @@ def move_files_and_log(ctx: ProcessingContext, audio_file: Path, transcript_file
     else:
         ctx.vprint(f"🗑️ Audio file discarded", 2)
     
-    ctx.vprint(f"✅ Transcript saved to: '{final_transcript}'")
+    for final_file in final_files:
+        ctx.vprint(f"✅ Transcript saved to: '{final_file}'")
 
 
 def transcribe_and_save(ctx: ProcessingContext, audio_file: Path, title: str) -> Result[None, str]:
     """Transcribe audio and save files after validation."""
     final_name = get_final_name(title, ctx.config.custom_name)
-    ctx.vprint(f"📝 Transcribing to '{audio_file.with_suffix('.txt').name}'...", 2)
+    ctx.vprint(f"📝 Transcribing to multiple formats...", 2)
     ctx.vprint("📝 Transcribing audio...", 1)
     
-    transcript_file = create_transcript_file(audio_file, ctx)
-    move_files_and_log(ctx, audio_file, transcript_file, final_name)
+    transcript_files = create_transcript_file(audio_file, ctx, title)
+    move_files_and_log(ctx, audio_file, transcript_files, final_name)
     return Success(None)
 
 
 def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str) -> Result[None, str]:
     """Handle file-based output (non-stdout mode)."""
     final_name = get_final_name(title, ctx.config.custom_name)
-    final_transcript = ctx.config.output_dir / f"{final_name}.txt"
     
-    return (
-        check_file_overwrite(final_transcript, ctx.config.force_overwrite)
-        .bind(lambda _: transcribe_and_save(ctx, audio_file, title))
-    )
+    # Check if any output files would be overwritten
+    for fmt in ctx.config.formats:
+        final_file = ctx.config.output_dir / f"{final_name}.{fmt}"
+        overwrite_check = check_file_overwrite(final_file, ctx.config.overwrite_files)
+        if not is_successful(overwrite_check):
+            return overwrite_check
+    
+    return transcribe_and_save(ctx, audio_file, title)
 
 
-def handle_stdout_output(audio_file: Path):
+def handle_stdout_output(ctx: ProcessingContext, audio_file: Path):
     """Handle stdout-based output."""
-    transcribe_to_stdout(audio_file)
+    format_type = ctx.config.formats[0]  # Already validated to be single format
+    transcribe_to_stdout(audio_file, format_type)
 
 
 def process_audio(ctx: ProcessingContext) -> Result[None, str]:
@@ -345,7 +457,7 @@ def process_audio(ctx: ProcessingContext) -> Result[None, str]:
     return (
         input_processor(ctx)
         .bind(lambda result: 
-            Success(handle_stdout_output(result[1])) if ctx.config.stdout_mode
+            Success(handle_stdout_output(ctx, result[1])) if ctx.config.stdout_mode
             else handle_file_output(ctx, result[1], result[0])
         )
     )
@@ -357,9 +469,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("input", nargs='?', help="Internet URL or local media file (optional if --version is used)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (use -vv for debug output)")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep the audio file")
-    parser.add_argument("-f", "--force", action="store_true", help="Overwrite any existing transcript file without confirmation")
+    parser.add_argument("-f", "--format", default="txt", help="Output format(s): txt, json")
     parser.add_argument("-n", "--name", help="Base name for audio and transcript file (no extension)")
     parser.add_argument("-o", "--output", help="Directory to save output files to (default: current directory)")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing transcript file without confirmation")
     parser.add_argument("--stdout", action="store_true", help="Output transcript to stdout only (no file written, all other output silenced)")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}", help="Show program's version number and exit")
     return parser.parse_args()
@@ -371,6 +484,27 @@ def validate_arguments(args: argparse.Namespace):
         parser = argparse.ArgumentParser()
         parser.print_help(sys.stderr)
         sys.exit(1)
+
+
+def parse_and_validate_formats(format_string: str, stdout_mode: bool) -> list[str]:
+    """Parse and validate format string."""
+    SUPPORTED_FORMATS = {'txt', 'json'}
+    
+    formats = [fmt.strip().lower() for fmt in format_string.split(',')]
+    
+    # Validate formats
+    invalid_formats = [fmt for fmt in formats if fmt not in SUPPORTED_FORMATS]
+    if invalid_formats:
+        print(f"Error: Invalid format(s): {', '.join(invalid_formats)}", file=sys.stderr)
+        print(f"Supported formats: {', '.join(sorted(SUPPORTED_FORMATS))}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Check stdout compatibility
+    if stdout_mode and len(formats) > 1:
+        print("Error: Only one format allowed when using --stdout", file=sys.stderr)
+        sys.exit(1)
+    
+    return formats
 
 
 def create_config(args: argparse.Namespace) -> Config:
@@ -386,10 +520,11 @@ def create_config(args: argparse.Namespace) -> Config:
         input_path=args.input,
         verbose_level=args.verbose,
         keep_audio=args.keep,
-        force_overwrite=args.force,
+        overwrite_files=args.overwrite,
         custom_name=custom_name,
         output_dir=output_dir,
-        stdout_mode=args.stdout
+        stdout_mode=args.stdout,
+        formats=parse_and_validate_formats(args.format, args.stdout)
     )
 
 

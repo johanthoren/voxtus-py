@@ -2,7 +2,18 @@
 
 **Voxtus is a command-line tool for transcribing Internet videos and media files to text using [faster-whisper](https://github.com/guillaumekln/faster-whisper).**
 
-It supports `.mp3` files and can download, transcribe, and optionally retain the original audio. It's built in Python and installable as a proper CLI via PyPI or from source.
+It supports multiple output formats and can download, transcribe, and optionally retain the original audio. It's built in Python and installable as a proper CLI via PyPI or from source.
+
+## ✨ Features
+
+- 🎥 **Download & transcribe** videos from YouTube, Vimeo, and 1000+ sites
+- 📁 **Local file support** for audio/video files  
+- 📝 **Multiple output formats**: TXT, JSON
+- 🔄 **Batch processing** multiple formats in one run
+- 📊 **Rich metadata** in JSON format (title, source, duration, language)
+- 🚀 **Stdout mode** for pipeline integration
+- 🎯 **LLM-friendly** default text format
+- ⚡ **Fast** transcription via faster-whisper
 
 ---
 
@@ -59,33 +70,108 @@ voxtus --help
 
 ---
 
+## 📋 Output Formats
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| **TXT** | Plain text with timestamps | Default, LLM processing, reading |
+| **JSON** | Structured data with metadata | APIs, data analysis, archival |
+
+*Additional formats (SRT, VTT, CSV) are planned for future releases.*
+
+---
+
 ## 🧪 Examples
 
+### Basic Usage
+
 ```bash
-# Transcribe a YouTube video to myfile.txt
-voxtus -n myfile https://www.youtube.com/watch?v=abc123
+# Transcribe to default TXT format
+voxtus https://www.youtube.com/watch?v=abc123
 
-# Transcribe and show output live
-voxtus -v https://youtu.be/example
+# Transcribe local file
+voxtus recording.mp3
+```
 
-# Transcribe a local mp3 file and keep the audio
-voxtus -k -n interview recording.mp3
+### Format Selection
 
-# Output to a custom folder
-voxtus -n meeting -o transcripts https://youtu.be/abc123
+```bash
+# Single format
+voxtus video.mp4 -f json
+
+# Multiple formats at once
+voxtus video.mp4 -f txt,json
+```
+
+### Advanced Usage
+
+```bash
+# Custom name and output directory
+voxtus -f json -n "meeting_notes" -o ~/transcripts video.mp4
+
+# Verbose output with audio retention
+voxtus -v -k -f txt,json https://youtu.be/example
+
+# Pipeline integration
+voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
+
+# Overwrite existing files
+voxtus video.mp4 -f json --overwrite
+```
+
+### Real-world Examples
+
+```bash
+# Generate data for analysis
+voxtus podcast.mp3 -f json -o ~/podcast_analysis
+
+# LLM processing pipeline
+voxtus lecture.mp4 -f txt --stdout | llm "summarize this lecture"
+
+# Both formats for different uses
+voxtus interview.mp4 -f txt,json -n "interview_2024"
 ```
 
 ---
 
 ## 🔧 Options
 
-| Option         | Description                                 |
-|----------------|---------------------------------------------|
-| `-v`, `--verbose` | Print each line of transcription to stdout |
-| `-k`, `--keep`    | Retain the downloaded or copied audio file |
-| `-n <name>`       | Base name for transcript/audio output (no extension) |
-| `-o <dir>`        | Output directory (default: current working directory) |
-| `-f`, `--force`   | Overwrite existing transcript without prompt |
+| Option | Description |
+|--------|-------------|
+| `-f`, `--format FORMAT` | Output format(s): txt, json (comma-separated) |
+| `-n, --name NAME` | Base name for output files (no extension) |
+| `-o, --output DIR` | Output directory (default: current directory) |
+| `-v, --verbose` | Increase verbosity (-v, -vv for debug) |
+| `-k, --keep` | Keep the downloaded/converted audio file |
+| `--overwrite` | Overwrite existing files without confirmation |
+| `--stdout` | Output to stdout (single format only) |
+| `--version` | Show version and exit |
+
+---
+
+## 📊 JSON Format Structure
+
+The JSON format includes rich metadata for advanced use cases:
+
+```json
+{
+  "transcript": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 5.2,
+      "text": "Welcome to our podcast."
+    }
+  ],
+  "metadata": {
+    "title": "Podcast Episode 42",
+    "source": "https://youtube.com/watch?v=...",
+    "duration": 1523.5,
+    "model": "base",
+    "language": "en"
+  }
+}
+```
 
 ---
 
