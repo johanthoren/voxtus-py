@@ -72,29 +72,55 @@ make test
 
 ### Development Workflow
 
-The project uses a simple Makefile for development tasks:
+The project uses a simple Makefile for development tasks. All targets automatically verify dependencies and provide helpful installation instructions if tools are missing.
 
 ```bash
-make help              # Show all available commands
+make help              # Show all available commands with dynamic version examples
 make install           # Install package and dependencies
 make dev-install       # Install with development dependencies
-make test              # Run tests
+make test              # Run tests (fast)
 make test-coverage     # Run tests with coverage report
+make test-ci           # Run GitHub Actions workflow locally (requires act)
+
+# Dependency verification
+make verify-uv         # Check if uv is installed
+make verify-act        # Check if act is installed
 
 # Release (bumps version, commits, tags, and pushes)
-make release           # Patch release (0.1.9 -> 0.1.10)
-make release patch     # Patch release (0.1.9 -> 0.1.10)
-make release minor     # Minor release (0.1.9 -> 0.2.0)
-make release major     # Major release (0.1.9 -> 1.0.0)
+make release           # Patch release (e.g., 0.1.9 -> 0.1.10)
+make release patch     # Patch release (same as above)
+make release minor     # Minor release (e.g., 0.1.9 -> 0.2.0)
+make release major     # Major release (e.g., 0.1.9 -> 1.0.0)
 ```
 
-The release process automatically:
-1. Checks that working directory is clean
-2. Runs tests
-3. Bumps the version in `pyproject.toml`
-4. Commits the version change
-5. Creates a git tag
-6. Pushes commit and tag to trigger GitHub Actions CI/CD
+### Dependencies
+
+The Makefile automatically checks for required tools:
+
+- **uv** - Fast Python package manager (required for most targets)
+  - Install: `curl -LsSf https://astral.sh/uv/install.sh | sh` or `brew install uv`
+- **act** - Run GitHub Actions locally (optional, only for `test-ci`)
+  - Install: `brew install act` or see [installation guide](https://github.com/nektos/act#installation)
+
+### Enhanced Release Process
+
+The release process includes comprehensive safety checks:
+
+1. **Git Status Check** - Offers to stage and commit pending changes
+2. **Test Suite** - Runs tests with coverage reporting  
+3. **Coverage Validation** - Prompts if coverage is below 80%
+4. **Version Bump** - Updates `pyproject.toml` and commits the change
+5. **Git Operations** - Creates tag and pushes to trigger CI/CD
+
+### Local CI Testing
+
+Use `make test-ci` to run the exact same GitHub Actions workflow locally:
+
+```bash
+make test-ci    # Runs .github/workflows/test.yml with act
+```
+
+This ensures your changes work in the CI environment before pushing.
 
 ---
 
