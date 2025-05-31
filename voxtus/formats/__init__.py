@@ -47,7 +47,7 @@ class FormatWriter:
         """Write segments to the specified format."""
         raise NotImplementedError("Format writers must implement write()")
     
-    def write_to_stdout(self, segments: List[Any], info: Any) -> None:
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
         """Write segments to stdout in the specified format."""
         raise NotImplementedError("Format writers must implement write_to_stdout()")
 
@@ -79,11 +79,11 @@ def write_format(format_name: str, segments: List[Any], output_file: Path, title
     writer.write(segments, output_file, title, source, info, verbose, vprint_func)
 
 
-def write_format_to_stdout(format_name: str, segments: List[Any], info: Any) -> None:
+def write_format_to_stdout(format_name: str, segments: List[Any], title: str, source: str, info: Any) -> None:
     """Write segments to stdout using the specified format."""
     writer = get_format_writer(format_name)
-    writer.write_to_stdout(segments, info)
+    writer.write_to_stdout(segments, title, source, info)
 
 
 # Auto-import format modules to register them
-from . import json, srt, txt
+from . import json, srt, txt, vtt
