@@ -590,7 +590,7 @@ class TestTranscriptionProgress:
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
             
-            transcribe_to_stdout(audio_file, "txt")
+            transcribe_to_stdout(audio_file, "txt", "Test Title", "test.mp3")
         
         captured = capsys.readouterr()
         # Stdout should only contain transcript
@@ -960,7 +960,7 @@ class TestSRTFormat:
             segment.text = f"Line {i + 1}"
             segments.append(segment)
         
-        write_format_to_stdout("srt", segments, None)
+        write_format_to_stdout("srt", segments, "Test Title", "test.mp4", None)
         
         captured = capsys.readouterr()
         expected_output = (
@@ -1020,4 +1020,306 @@ class TestSRTFormat:
         # Check that verbose messages were logged
         assert any("SRT segment 1: 0.00s - 1.00s" in call[0] for call in vprint_calls)
         assert any("SRT segment 2: 1.00s - 2.00s" in call[0] for call in vprint_calls)
-        assert any("SRT format written with 2 subtitle segments" in call[0] for call in vprint_calls) 
+        assert any("SRT format written with 2 subtitle segments" in call[0] for call in vprint_calls)
+
+
+class TestVTTFormat:
+    """Test VTT format functionality."""
+    
+    def test_vtt_timestamp_formatting(self):
+        """Test VTT timestamp formatting function."""
+        from voxtus.formats.vtt import format_timestamp
+
+        # Test basic timestamp
+        assert format_timestamp(0.0) == "00:00:00.000"
+        assert format_timestamp(65.5) == "00:01:05.500"
+        assert format_timestamp(3661.123) == "01:01:01.123"
+        
+        # Test edge cases
+        assert format_timestamp(0.999) == "00:00:00.999"
+        assert format_timestamp(3599.999) == "00:59:59.999"
+        assert format_timestamp(7200.0) == "02:00:00.000"
+    
+    def test_vtt_segment_formatting(self):
+        """Test VTT segment formatting function."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.vtt import format_vtt_segment
+
+        # Mock segment
+        segment = Mock()
+        segment.start = 0.0
+        segment.end = 5.2
+        segment.text = "Hello world"
+        
+        result = format_vtt_segment(segment)
+        expected = "00:00:00.000 --> 00:00:05.200\nHello world\n"
+        assert result == expected
+    
+    def test_vtt_segment_with_whitespace(self):
+        """Test VTT segment formatting strips whitespace."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.vtt import format_vtt_segment
+
+        # Mock segment with leading/trailing whitespace
+        segment = Mock()
+        segment.start = 10.5
+        segment.end = 15.75
+        segment.text = "  Text with spaces  "
+        
+        result = format_vtt_segment(segment)
+        expected = "00:00:10.500 --> 00:00:15.750\nText with spaces\n"
+        assert result == expected
+    
+    def test_vtt_metadata_formatting_complete(self):
+        """Test VTT metadata formatting with complete information."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.vtt import format_metadata_notes
+
+        # Mock info object with complete metadata
+        info = Mock()
+        info.duration = 123.45
+        info.language = "en"
+        
+        result = format_metadata_notes("Test Video", "https://example.com/video", info)
+        
+        # Check that all required fields are present
+        assert "NOTE Title\nTest Video" in result
+        assert "NOTE Source\nhttps://example.com/video" in result
+        assert "NOTE Duration\n00:02:03.450" in result
+        assert "NOTE Language\nen" in result
+        assert "NOTE Model\nbase" in result
+    
+    def test_vtt_metadata_formatting_minimal(self):
+        """Test VTT metadata formatting with minimal information."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.vtt import format_metadata_notes
+
+        # Mock info object with no metadata
+        info = Mock()
+        # Simulate missing attributes
+        delattr(info, 'duration') if hasattr(info, 'duration') else None
+        delattr(info, 'language') if hasattr(info, 'language') else None
+        
+        result = format_metadata_notes("unknown", "unknown", info)
+        
+        # Check that all fields are still present with "unknown" values
+        assert "NOTE Title\nunknown" in result
+        assert "NOTE Source\nunknown" in result
+        assert "NOTE Duration\nunknown" in result
+        assert "NOTE Language\nunknown" in result
+        assert "NOTE Model\nbase" in result
+    
+    def test_vtt_metadata_formatting_partial(self):
+        """Test VTT metadata formatting with partial information."""
+        from unittest.mock import Mock
+
+        from voxtus.formats.vtt import format_metadata_notes
+
+        # Mock info object with only language - no duration attribute
+        info = Mock(spec=[])  # Empty spec means no attributes
+        info.language = "es"
+        
+        result = format_metadata_notes("Partial Video", "unknown", info)
+        
+        # Check field presence and values
+        assert "NOTE Title\nPartial Video" in result
+        assert "NOTE Source\nunknown" in result
+        assert "NOTE Duration\nunknown" in result
+        assert "NOTE Language\nes" in result
+        assert "NOTE Model\nbase" in result
+    
+    def test_vtt_format_structure(self, tmp_path):
+        """Test VTT format output structure."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segments
+        segments = []
+        for i in range(3):
+            segment = Mock()
+            segment.start = i * 2.0
+            segment.end = (i + 1) * 2.0
+            segment.text = f"Subtitle {i + 1}"
+            segments.append(segment)
+        
+        # Mock info object
+        info = Mock()
+        info.duration = 6.0
+        info.language = "en"
+        
+        output_file = tmp_path / "test.vtt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("vtt", segments, output_file, "Test Title", "test.mp4", info, False, vprint)
+        
+        # Read the file
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        # Verify VTT structure
+        assert content.startswith("WEBVTT\n\n")
+        assert "NOTE Title\nTest Title" in content
+        assert "NOTE Source\ntest.mp4" in content
+        assert "NOTE Duration\n00:00:06.000" in content
+        assert "NOTE Language\nen" in content
+        assert "NOTE Model\nbase" in content
+        assert "00:00:00.000 --> 00:00:02.000\nSubtitle 1" in content
+        assert "00:00:02.000 --> 00:00:04.000\nSubtitle 2" in content
+        assert "00:00:04.000 --> 00:00:06.000\nSubtitle 3" in content
+    
+    def test_vtt_format_with_long_duration(self, tmp_path):
+        """Test VTT format with timestamps over an hour."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segment with long duration
+        segment = Mock()
+        segment.start = 3661.5  # 1 hour, 1 minute, 1.5 seconds
+        segment.end = 3665.0    # 1 hour, 1 minute, 5 seconds
+        segment.text = "Long duration subtitle"
+        
+        # Mock info object
+        info = Mock()
+        info.duration = 3665.0
+        info.language = "en"
+        
+        output_file = tmp_path / "test_long.vtt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("vtt", [segment], output_file, "Test", "test.mp4", info, False, vprint)
+        
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        assert "01:01:01.500 --> 01:01:05.000\nLong duration subtitle" in content
+        assert "NOTE Duration\n01:01:05.000" in content
+    
+    def test_vtt_format_stdout(self, capsys):
+        """Test VTT format stdout output."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format_to_stdout
+
+        # Mock segments
+        segments = []
+        for i in range(2):
+            segment = Mock()
+            segment.start = i * 1.5
+            segment.end = (i + 1) * 1.5
+            segment.text = f"Line {i + 1}"
+            segments.append(segment)
+        
+        # Mock info object
+        info = Mock()
+        info.duration = 3.0
+        info.language = "en"
+        
+        write_format_to_stdout("vtt", segments, "Test Title", "test.mp4", info)
+        
+        captured = capsys.readouterr()
+        
+        # Check VTT structure in stdout
+        assert captured.out.startswith("WEBVTT\n\n")
+        assert "NOTE Title\nTest Title" in captured.out
+        assert "NOTE Source\ntest.mp4" in captured.out
+        assert "NOTE Duration\n00:00:03.000" in captured.out
+        assert "NOTE Language\nen" in captured.out
+        assert "00:00:00.000 --> 00:00:01.500\nLine 1" in captured.out
+        assert "00:00:01.500 --> 00:00:03.000\nLine 2" in captured.out
+    
+    def test_vtt_format_with_unicode(self, tmp_path):
+        """Test VTT format handles Unicode characters properly."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segment with Unicode characters
+        segment = Mock()
+        segment.start = 0.0
+        segment.end = 3.0
+        segment.text = "Café résumé naïve 中文 🎵"
+        
+        # Mock info object
+        info = Mock()
+        info.duration = 3.0
+        info.language = "zh"
+        
+        output_file = tmp_path / "test_unicode.vtt"
+        vprint = lambda msg, level=0: None
+        
+        write_format("vtt", [segment], output_file, "Unicode Test", "test.mp4", info, False, vprint)
+        
+        # Read with explicit UTF-8 encoding
+        with open(output_file, encoding="utf-8") as f:
+            content = f.read()
+        
+        assert "Café résumé naïve 中文 🎵" in content
+        assert "NOTE Language\nzh" in content
+        assert "00:00:00.000 --> 00:00:03.000\nCafé résumé naïve 中文 🎵" in content
+    
+    def test_vtt_format_verbose_logging(self, tmp_path):
+        """Test VTT format verbose logging."""
+        from unittest.mock import Mock
+
+        from voxtus.formats import write_format
+
+        # Mock segments
+        segments = []
+        for i in range(2):
+            segment = Mock()
+            segment.start = i * 1.0
+            segment.end = (i + 1) * 1.0
+            segment.text = f"Segment {i + 1}"
+            segments.append(segment)
+        
+        # Mock info object
+        info = Mock()
+        info.duration = 2.0
+        info.language = "en"
+        
+        # Mock vprint function to capture calls
+        vprint_calls = []
+        def mock_vprint(msg, level=0):
+            vprint_calls.append((msg, level))
+        
+        output_file = tmp_path / "test_verbose.vtt"
+        
+        write_format("vtt", segments, output_file, "Test", "test.mp4", info, True, mock_vprint)
+        
+        # Check that verbose messages were logged
+        assert any("VTT segment 1: 0.00s - 1.00s" in call[0] for call in vprint_calls)
+        assert any("VTT segment 2: 1.00s - 2.00s" in call[0] for call in vprint_calls)
+        assert any("VTT format written with 2 subtitle segments and metadata" in call[0] for call in vprint_calls)
+    
+    def test_vtt_format_validation(self):
+        """Test that VTT format is properly registered and validated."""
+        from voxtus.__main__ import parse_and_validate_formats
+
+        # Test VTT as single format
+        result = parse_and_validate_formats("vtt", False)
+        assert result == ["vtt"]
+        
+        # Test VTT in combination with other formats
+        result = parse_and_validate_formats("txt,vtt,srt", False)
+        assert "vtt" in result
+        assert len(result) == 3
+    
+    def test_vtt_registration(self):
+        """Test that VTT format is properly registered in the format system."""
+        from voxtus.formats import get_format_writer, get_supported_formats
+
+        # Check VTT is in supported formats
+        supported = get_supported_formats()
+        assert "vtt" in supported
+        
+        # Check we can get the VTT writer
+        writer = get_format_writer("vtt")
+        assert writer is not None
+        assert hasattr(writer, 'write')
+        assert hasattr(writer, 'write_to_stdout') 
