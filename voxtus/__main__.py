@@ -61,6 +61,9 @@ from returns.pipeline import flow, is_successful
 from returns.result import Failure, Result, Success, safe
 from yt_dlp import YoutubeDL
 
+from .formats import (get_supported_formats, write_format,
+                      write_format_to_stdout)
+
 __version__ = importlib.metadata.version("voxtus")
 
 
@@ -152,52 +155,6 @@ def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode:
         return extract_and_download_media(input_path, output_path, False, stdout_mode)
     return result
 
-
-def format_transcript_line(segment) -> str:
-    """Format a transcript segment into a line."""
-    return f"[{segment.start:.2f} - {segment.end:.2f}]: {segment.text}"
-
-
-def write_txt_format(segments, output_file: Path, verbose: bool, vprint_func: Callable[[str, int], None]):
-    """Write transcript in TXT format."""
-    with output_file.open("w", encoding="utf-8") as f:
-        for segment in segments:
-            line = format_transcript_line(segment)
-            f.write(line + "\n")
-            if verbose:
-                vprint_func(line, 1)
-
-
-def write_json_format(segments, output_file: Path, title: str, source: str, info, verbose: bool, vprint_func: Callable[[str, int], None]):
-    """Write transcript in JSON format with metadata."""
-    import json
-    
-    transcript_data = {
-        "transcript": [
-            {
-                "id": i + 1,
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text
-            }
-            for i, segment in enumerate(segments)
-        ],
-        "metadata": {
-            "title": title,
-            "source": source,
-            "duration": info.duration if hasattr(info, 'duration') else None,
-            "model": "base",
-            "language": info.language if hasattr(info, 'language') else "en"
-        }
-    }
-    
-    with output_file.open("w", encoding="utf-8") as f:
-        json.dump(transcript_data, f, indent=2, ensure_ascii=False)
-    
-    if verbose:
-        vprint_func(f"JSON format written with {len(transcript_data['transcript'])} segments", 1)
-
-
 def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, vprint_func: Callable[[str, int], None]) -> list[Path]:
     """Transcribe audio to multiple formats."""
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
@@ -222,16 +179,11 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     if not verbose and total_duration:
         print(f"\r📝 Transcribing... 100.0% ({total_duration:.1f}s / {total_duration:.1f}s)", file=sys.stderr)
     
-    # Write all requested formats
+    # Write all requested formats using the new format system
     output_files = []
     for fmt in formats:
         output_file = base_output_path.with_suffix(f".{fmt}")
-        
-        if fmt == "txt":
-            write_txt_format(segments_list, output_file, verbose, vprint_func)
-        elif fmt == "json":
-            write_json_format(segments_list, output_file, title, source, info, verbose, vprint_func)
-        
+        write_format(fmt, segments_list, output_file, title, source, info, verbose, vprint_func)
         output_files.append(output_file)
     
     return output_files
@@ -243,32 +195,7 @@ def transcribe_to_stdout(audio_file: Path, format_type: str):
     segments, info = model.transcribe(str(audio_file))
 
     segments_list = list(segments)
-    
-    if format_type == "txt":
-        for segment in segments_list:
-            line = format_transcript_line(segment)
-            print(line)
-    elif format_type == "json":
-        import json
-        transcript_data = {
-            "transcript": [
-                {
-                    "id": i + 1,
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text
-                }
-                for i, segment in enumerate(segments_list)
-            ],
-            "metadata": {
-                "title": "unknown",
-                "source": "unknown", 
-                "duration": info.duration if hasattr(info, 'duration') else None,
-                "model": "base",
-                "language": info.language if hasattr(info, 'language') else "en"
-            }
-        }
-        print(json.dumps(transcript_data, indent=2, ensure_ascii=False))
+    write_format_to_stdout(format_type, segments_list, info)
 
 
 def check_ffmpeg(vprint_func: Callable[[str, int], None]):
@@ -488,15 +415,15 @@ def validate_arguments(args: argparse.Namespace):
 
 def parse_and_validate_formats(format_string: str, stdout_mode: bool) -> list[str]:
     """Parse and validate format string."""
-    SUPPORTED_FORMATS = {'txt', 'json'}
+    supported_formats = set(get_supported_formats())
     
     formats = [fmt.strip().lower() for fmt in format_string.split(',')]
     
     # Validate formats
-    invalid_formats = [fmt for fmt in formats if fmt not in SUPPORTED_FORMATS]
+    invalid_formats = [fmt for fmt in formats if fmt not in supported_formats]
     if invalid_formats:
         print(f"Error: Invalid format(s): {', '.join(invalid_formats)}", file=sys.stderr)
-        print(f"Supported formats: {', '.join(sorted(SUPPORTED_FORMATS))}", file=sys.stderr)
+        print(f"Supported formats: {', '.join(sorted(supported_formats))}", file=sys.stderr)
         sys.exit(1)
     
     # Check stdout compatibility

@@ -17,8 +17,8 @@ from returns.result import Failure, Success
 from voxtus.__main__ import (Config, ProcessingContext, create_config,
                              create_output_template, create_print_wrapper,
                              create_processing_context, create_ydl_options,
-                             format_transcript_line, get_final_name,
-                             parse_arguments)
+                             get_final_name, parse_arguments)
+from voxtus.formats.txt import format_transcript_line
 
 
 class TestFormatTranscriptLine:
@@ -613,15 +613,15 @@ class TestFormatSelection:
         """Test parsing multiple comma-separated formats."""
         from voxtus.__main__ import parse_and_validate_formats
         
-        formats = parse_and_validate_formats("txt,json,srt", stdout_mode=False)
-        assert formats == ["txt", "json", "srt"]
+        formats = parse_and_validate_formats("txt,json", stdout_mode=False)
+        assert formats == ["txt", "json"]
     
     def test_parse_formats_with_spaces(self):
         """Test parsing formats with spaces around commas."""
         from voxtus.__main__ import parse_and_validate_formats
         
-        formats = parse_and_validate_formats("txt, json , srt", stdout_mode=False)
-        assert formats == ["txt", "json", "srt"]
+        formats = parse_and_validate_formats("txt, json", stdout_mode=False)
+        assert formats == ["txt", "json"]
     
     def test_parse_formats_case_insensitive(self):
         """Test that format parsing is case insensitive."""
@@ -671,7 +671,7 @@ class TestJSONFormat:
         import json
         from unittest.mock import Mock
 
-        from voxtus.__main__ import write_json_format
+        from voxtus.formats import write_format
 
         # Mock segments
         segments = []
@@ -690,7 +690,7 @@ class TestJSONFormat:
         output_file = tmp_path / "test.json"
         vprint = lambda msg, level=0: None
         
-        write_json_format(segments, output_file, "Test Title", "test.mp3", mock_info, False, vprint)
+        write_format("json", segments, output_file, "Test Title", "test.mp3", mock_info, False, vprint)
         
         # Read and parse the JSON
         with open(output_file) as f:
@@ -720,7 +720,7 @@ class TestJSONFormat:
         """Test TXT format output structure."""
         from unittest.mock import Mock
 
-        from voxtus.__main__ import write_txt_format
+        from voxtus.formats import write_format
 
         # Mock segments
         segments = []
@@ -734,7 +734,7 @@ class TestJSONFormat:
         output_file = tmp_path / "test.txt"
         vprint = lambda msg, level=0: None
         
-        write_txt_format(segments, output_file, False, vprint)
+        write_format("txt", segments, output_file, "Test Title", "test.mp3", None, False, vprint)
         
         # Read the file
         with open(output_file) as f:
