@@ -43,7 +43,7 @@ class JsonFormatWriter(FormatWriter):
         if verbose:
             vprint_func(f"JSON format written with {len(transcript_data['transcript'])} segments", 1)
     
-    def write_to_stdout(self, segments: List[Any], info: Any) -> None:
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
         """Write transcript to stdout in JSON format."""
         transcript_data = {
             "transcript": [
@@ -56,8 +56,8 @@ class JsonFormatWriter(FormatWriter):
                 for i, segment in enumerate(segments)
             ],
             "metadata": {
-                "title": "unknown",
-                "source": "unknown", 
+                "title": title,
+                "source": source, 
                 "duration": info.duration if hasattr(info, 'duration') else None,
                 "model": "base",
                 "language": info.language if hasattr(info, 'language') else "en"

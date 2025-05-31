@@ -28,7 +28,7 @@ class TxtFormatWriter(FormatWriter):
                 if verbose:
                     vprint_func(line, 1)
     
-    def write_to_stdout(self, segments: List[Any], info: Any) -> None:
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
         """Write transcript to stdout in TXT format."""
         for segment in segments:
             line = format_transcript_line(segment)

@@ -5,7 +5,7 @@ This CLI tool supports:
 - Downloading media from the Internet via the yt_dlp library
 - Processing local media files (audio/video formats)
 - Transcribing using the Whisper model via faster-whisper
-- Multiple output formats: TXT, JSON, SRT
+- Multiple output formats: TXT, JSON, SRT, VTT
 - Rich metadata in JSON format
 - Multiple format output in a single run
 - Optional verbose output and audio retention
@@ -16,16 +16,20 @@ Output Formats:
 - TXT: Plain text with timestamps (default, LLM-friendly)
 - JSON: Structured data with metadata (title, source, duration, etc.)
 - SRT: SubRip subtitle format for video players
+- VTT: WebVTT subtitle format for web browsers
 
 Examples:
     # Basic transcription (default TXT format)
     voxtus video.mp4
 
     # Multiple formats
-    voxtus video.mp4 -f txt,json,srt
+    voxtus video.mp4 -f txt,json,srt,vtt
 
     # SRT format for subtitles
     voxtus video.mp4 -f srt
+
+    # VTT format for web video
+    voxtus video.mp4 -f vtt
 
     # JSON format to stdout for processing
     voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
@@ -193,13 +197,13 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     return output_files
 
 
-def transcribe_to_stdout(audio_file: Path, format_type: str):
+def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str):
     """Transcribe audio directly to stdout in specified format."""
     model = WhisperModel("base", compute_type="auto")
     segments, info = model.transcribe(str(audio_file))
 
     segments_list = list(segments)
-    write_format_to_stdout(format_type, segments_list, info)
+    write_format_to_stdout(format_type, segments_list, title, source, info)
 
 
 def check_ffmpeg(vprint_func: Callable[[str, int], None]):
@@ -375,10 +379,10 @@ def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str) -> 
     return transcribe_and_save(ctx, audio_file, title)
 
 
-def handle_stdout_output(ctx: ProcessingContext, audio_file: Path):
+def handle_stdout_output(ctx: ProcessingContext, audio_file: Path, title: str):
     """Handle stdout-based output."""
     format_type = ctx.config.formats[0]  # Already validated to be single format
-    transcribe_to_stdout(audio_file, format_type)
+    transcribe_to_stdout(audio_file, format_type, title, ctx.config.input_path)
 
 
 def process_audio(ctx: ProcessingContext) -> Result[None, str]:
@@ -388,7 +392,7 @@ def process_audio(ctx: ProcessingContext) -> Result[None, str]:
     return (
         input_processor(ctx)
         .bind(lambda result: 
-            Success(handle_stdout_output(ctx, result[1])) if ctx.config.stdout_mode
+            Success(handle_stdout_output(ctx, result[1], result[0])) if ctx.config.stdout_mode
             else handle_file_output(ctx, result[1], result[0])
         )
     )
@@ -400,7 +404,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("input", nargs='?', help="Internet URL or local media file (optional if --version is used)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (use -vv for debug output)")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep the audio file")
-    parser.add_argument("-f", "--format", default="txt", help="Output format(s) (comma-separated): txt, json, srt")
+    parser.add_argument("-f", "--format", default="txt", help="Output format(s) (comma-separated): txt, json, srt, vtt")
     parser.add_argument("-n", "--name", help="Base name for audio and transcript file (no extension)")
     parser.add_argument("-o", "--output", help="Directory to save output files to (default: current directory)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing transcript file without confirmation")

@@ -46,7 +46,7 @@ class SrtFormatWriter(FormatWriter):
         if verbose:
             vprint_func(f"SRT format written with {len(segments)} subtitle segments", 1)
     
-    def write_to_stdout(self, segments: List[Any], info: Any) -> None:
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
         """Write transcript to stdout in SRT format."""
         for i, segment in enumerate(segments, 1):
             srt_block = format_srt_segment(segment, i)
