@@ -128,7 +128,19 @@ release: verify-uv ## Bump version, commit, tag and push (args: patch|minor|majo
 	git push origin "$$current_branch"; \
 	git push origin "$$new_version"; \
 	echo "🎉 Release $$new_version completed!"; \
-	echo "📦 Package will be available on PyPI shortly"
+	echo "📦 Package will be available on PyPI shortly"; \
+	echo; \
+	echo "🔗 GitHub Actions workflow triggered:"; \
+	repo_url=$$(git remote get-url origin); \
+	if echo "$$repo_url" | grep -q "^git@github.com:"; then \
+		repo_path=$$(echo "$$repo_url" | sed 's/git@github.com://' | sed 's/\.git$$//'); \
+		actions_url="https://github.com/$$repo_path/actions"; \
+	elif echo "$$repo_url" | grep -q "^https://github.com/"; then \
+		actions_url=$$(echo "$$repo_url" | sed 's/\.git$$//' | sed 's/$$/\/actions/'); \
+	else \
+		actions_url="$$repo_url (check your repository's actions page)"; \
+	fi; \
+	echo "   $$actions_url"
 
 # Allow version arguments to be treated as targets (prevents "No rule to make target" error)
 patch minor major:
