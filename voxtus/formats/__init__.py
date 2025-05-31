@@ -2,7 +2,38 @@
 Format implementations for transcription output.
 
 This package contains individual format implementations that can be used
-to output transcriptions in various formats.
+to output transcriptions in various formats. The package uses a registry
+pattern to allow dynamic format discovery and extensible architecture.
+
+Architecture:
+    - FormatWriter: Base class that all format writers must inherit from
+    - Registry system: Automatic discovery of available formats
+    - Individual modules: Each format (txt, json, etc.) in its own file
+    - Auto-registration: Formats register themselves on import
+
+Adding New Formats:
+    1. Create a new file in this package (e.g., foo.py)
+    2. Inherit from FormatWriter and implement required methods
+    3. Call register_format() at module level
+    4. Import the module in this __init__.py file
+
+Example:
+    # In voxtus/formats/foo.py
+    class FooFormatWriter(FormatWriter):
+        def write(self, segments, output_file, title, source, info, verbose, vprint_func):
+            # Implementation here
+            pass
+        
+        def write_to_stdout(self, segments, info):
+            # Implementation here  
+            pass
+    
+    register_format("foo", FooFormatWriter())
+
+The format will then be automatically available via:
+    - get_supported_formats()
+    - write_format("foo", ...)
+    - CLI: voxtus video.mp4 -f foo
 """
 
 from pathlib import Path

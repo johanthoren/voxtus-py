@@ -79,6 +79,10 @@ voxtus --help
 
 *Additional formats (SRT, VTT, CSV) are planned for future releases.*
 
+### 🔧 Extensible Format System
+
+Voxtus uses a modular format system that makes adding new output formats straightforward. Each format is implemented as a separate module with its own writer class, making the codebase maintainable and extensible.
+
 ---
 
 ## 🧪 Examples
