@@ -1,7 +1,7 @@
 # Voxtus Development Makefile
 # Uses uv for fast Python package management
 
-.PHONY: help install dev-install test release
+.PHONY: help install dev-install test test-ci release verify-uv verify-act
 
 # Default target
 help: ## Show this help message
@@ -20,24 +20,41 @@ help: ## Show this help message
 	echo "  \033[36mmake release minor\033[0m  Bump minor version and release ($$current_version -> $$minor_version)"; \
 	echo "  \033[36mmake release major\033[0m  Bump major version and release ($$current_version -> $$major_version)"
 
+# Dependency verification
+verify-uv: ## Verify uv is installed
+	@which uv > /dev/null || (echo "❌ uv is not installed. Install with:" && \
+	echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" && \
+	echo "  # or: pip install uv" && \
+	echo "  # or: brew install uv (macOS)" && exit 1)
+	@echo "✅ uv is available"
+
+verify-act: ## Verify act is installed  
+	@which act > /dev/null || (echo "❌ act is not installed. Install with:" && \
+	echo "  brew install act (macOS)" && \
+	echo "  # or: https://github.com/nektos/act#installation" && exit 1)
+	@echo "✅ act is available"
+
 # Development setup
-install: ## Install package and dependencies
+install: verify-uv ## Install package and dependencies
 	uv sync
 	uv pip install -e .
 
-dev-install: ## Install package in development mode with dev dependencies
+dev-install: verify-uv ## Install package in development mode with dev dependencies
 	uv sync --extra dev
 	uv pip install -e ".[dev]"
 
 # Testing
-test: ## Run tests
+test: verify-uv ## Run tests
 	uv run pytest
 
-test-coverage: ## Run tests with coverage report
+test-coverage: verify-uv ## Run tests with coverage report
 	uv run pytest --cov=voxtus --cov-report=term-missing
 
+test-ci: verify-act ## Run tests using act (GitHub Actions locally)
+	act -W .github/workflows/test.yml
+
 # Release process
-release: ## Bump version, commit, tag and push (args: patch|minor|major, default: patch)
+release: verify-uv ## Bump version, commit, tag and push (args: patch|minor|major, default: patch)
 	@echo "🚀 Starting release process..."
 	@echo
 	@# Determine version bump type (default to patch)
