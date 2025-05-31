@@ -396,7 +396,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("input", nargs='?', help="Internet URL or local media file (optional if --version is used)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (use -vv for debug output)")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep the audio file")
-    parser.add_argument("-f", "--format", default="txt", help="Output format(s): txt, json")
+    parser.add_argument("-f", "--format", default="txt", help="Output format(s) (comma-separated): txt, json")
     parser.add_argument("-n", "--name", help="Base name for audio and transcript file (no extension)")
     parser.add_argument("-o", "--output", help="Directory to save output files to (default: current directory)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing transcript file without confirmation")
