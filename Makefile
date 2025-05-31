@@ -107,7 +107,8 @@ release: ## Bump version, commit, tag and push (args: patch|minor|major, default
 	echo "🏷️  Creating git tag: $$new_version"; \
 	git tag "$$new_version"; \
 	echo "📤 Pushing commit and tag to origin..."; \
-	git push origin main; \
+	current_branch=$$(git branch --show-current); \
+	git push origin "$$current_branch"; \
 	git push origin "$$new_version"; \
 	echo "🎉 Release $$new_version completed!"; \
 	echo "📦 Package will be available on PyPI shortly"
