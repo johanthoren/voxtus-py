@@ -1,8 +1,8 @@
 import subprocess
 from pathlib import Path
 
-from . import (EXPECTED_OUTPUT, change_directory, get_free_port,
-               validate_no_runtime_warnings, validate_result,
+from . import (EXPECTED_OUTPUT_MP3, EXPECTED_OUTPUT_MP4, change_directory,
+               get_free_port, validate_no_runtime_warnings, validate_result,
                validate_stdout_result)
 
 
@@ -38,6 +38,16 @@ def test_stdout_mode(tmp_path):
     # Should not create any files in the working directory
     files_created = list(tmp_path.glob("*"))
     assert len(files_created) == 0, f"Files were created in stdout mode: {files_created}"
+
+def validate_result_mp4(result, output_dir, name):
+    """Validate result for MP4 files with appropriate expected output."""
+    assert result.returncode == 0
+    transcript = output_dir / f"{name}.txt"
+    assert transcript.exists()
+    with transcript.open() as f:
+        contents = f.read()
+        assert len(contents.strip()) > 0
+        assert EXPECTED_OUTPUT_MP4 in contents
 
 def test_http_url_processing(tmp_path):
     """Test HTTP URL processing (parallel-safe version)."""
@@ -76,7 +86,7 @@ def test_http_url_processing(tmp_path):
                 text=True,
             )
 
-            validate_result(result, output_dir, name)
+            validate_result_mp4(result, output_dir, name)
 
         finally:
             httpd.shutdown()

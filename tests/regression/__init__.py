@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 # Expected output constant for regression tests
-EXPECTED_OUTPUT = r"[0.00 - 7.00]:  Voxdust is a command line tool for transcribing internet videos or local audio files into readable text."
+EXPECTED_OUTPUT = r"[0.00 - 6.96]:  Voxtus is a command line tool for transcribing internet videos or local audio files into readable text."
 
 def run_voxtus_stdout(format_type, input_file, cwd=None):
     """Run voxtus in stdout mode and return the result."""

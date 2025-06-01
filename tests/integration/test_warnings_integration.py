@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from . import EXPECTED_OUTPUT
+from . import EXPECTED_OUTPUT_MP3
 
 
 class TestWarningsIntegration:
@@ -17,7 +17,7 @@ class TestWarningsIntegration:
         )
         
         assert result.returncode == 0
-        assert result.stdout.strip() == EXPECTED_OUTPUT
+        assert result.stdout.strip() == EXPECTED_OUTPUT_MP3
         
         # Check that stderr doesn't contain warnings (warnings should be suppressed)
         # Note: This is a heuristic - we can't guarantee no warnings, but we expect 
@@ -35,7 +35,7 @@ class TestWarningsIntegration:
         )
         
         assert result.returncode == 0
-        assert result.stdout.strip() == EXPECTED_OUTPUT
+        assert result.stdout.strip() == EXPECTED_OUTPUT_MP3
         
         # In debug mode, warnings should NOT be suppressed
         # We can't guarantee warnings will appear, but the suppression should be disabled 

@@ -2,7 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from . import EXPECTED_OUTPUT
+from . import EXPECTED_OUTPUT_MP3
 
 
 def test_vtt_stdout_mode(tmp_path):

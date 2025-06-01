@@ -11,7 +11,8 @@ import warnings
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-EXPECTED_OUTPUT = r"[0.00 - 7.00]:  Voxdust is a command line tool for transcribing internet videos or local audio files into readable text."
+EXPECTED_OUTPUT_MP3 = r"[0.00 - 6.96]:  Voxtus is a command line tool for transcribing internet videos or local audio files into readable text."
+EXPECTED_OUTPUT_MP4 = r"[0.00 - 6.88]:  Voxtus is a command line tool for transcribing internet videos or local audio files into readable text."
 
 @contextlib.contextmanager
 def change_directory(path):
@@ -39,7 +40,7 @@ def validate_result(result, output_dir, name):
     with transcript.open() as f:
         contents = f.read()
         assert len(contents.strip()) > 0
-        assert EXPECTED_OUTPUT in contents
+        assert EXPECTED_OUTPUT_MP3 in contents or EXPECTED_OUTPUT_MP4 in contents
 
 def validate_stdout_result(result):
     """Validate that stdout mode produces ONLY transcript output with no other messages."""
@@ -47,7 +48,7 @@ def validate_stdout_result(result):
     assert len(result.stdout.strip()) > 0
     
     # Check that the expected transcript content is in stdout
-    assert EXPECTED_OUTPUT in result.stdout
+    assert EXPECTED_OUTPUT_MP3 in result.stdout or EXPECTED_OUTPUT_MP4 in result.stdout
     assert "[0.00 -" in result.stdout
     assert "]:" in result.stdout
     

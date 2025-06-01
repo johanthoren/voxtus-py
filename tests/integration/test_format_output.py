@@ -2,7 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from . import EXPECTED_OUTPUT, validate_no_runtime_warnings
+from . import EXPECTED_OUTPUT_MP3, validate_no_runtime_warnings
 
 
 def test_json_format_output(tmp_path):
