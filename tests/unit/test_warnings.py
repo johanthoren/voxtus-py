@@ -12,7 +12,7 @@ class TestWarningsSuppression:
 
         mock_model, mock_segment, mock_info = create_mock_whisper_model()
         
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model), \
+        with patch('faster_whisper.WhisperModel', return_value=mock_model), \
              patch('warnings.catch_warnings') as mock_catch_warnings:
             
             mock_context = Mock()
@@ -32,7 +32,7 @@ class TestWarningsSuppression:
 
         mock_model, mock_segment, mock_info = create_mock_whisper_model()
         
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model), \
+        with patch('faster_whisper.WhisperModel', return_value=mock_model), \
              patch('warnings.catch_warnings') as mock_catch_warnings:
             
             audio_file = tmp_path / "test.mp3"

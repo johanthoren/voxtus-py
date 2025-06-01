@@ -66,7 +66,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, TypeVar, Union
 
-from faster_whisper import WhisperModel
 from returns.pipeline import flow, is_successful
 from returns.result import Failure, Result, Success, safe
 from yt_dlp import YoutubeDL
@@ -78,6 +77,82 @@ __version__ = importlib.metadata.version("voxtus")
 
 # Global context for cleanup on signal interruption
 _cleanup_context: Optional['ProcessingContext'] = None
+
+# Available Whisper models with their characteristics
+AVAILABLE_MODELS = {
+    "tiny": {
+        "description": "Fastest model, 39M parameters",
+        "params": "39M",
+        "vram": "~1GB",
+        "languages": "multilingual"
+    },
+    "tiny.en": {
+        "description": "English-only tiny model",
+        "params": "39M", 
+        "vram": "~1GB",
+        "languages": "English only"
+    },
+    "base": {
+        "description": "Smaller balanced model, 74M parameters",
+        "params": "74M",
+        "vram": "~1GB", 
+        "languages": "multilingual"
+    },
+    "base.en": {
+        "description": "English-only base model",
+        "params": "74M",
+        "vram": "~1GB",
+        "languages": "English only"
+    },
+    "small": {
+        "description": "Default balanced model, 244M parameters",
+        "params": "244M",
+        "vram": "~2GB",
+        "languages": "multilingual"
+    },
+    "small.en": {
+        "description": "English-only small model",
+        "params": "244M",
+        "vram": "~2GB",
+        "languages": "English only"
+    },
+    "medium": {
+        "description": "Good accuracy model, 769M parameters",
+        "params": "769M",
+        "vram": "~5GB",
+        "languages": "multilingual"
+    },
+    "medium.en": {
+        "description": "English-only medium model", 
+        "params": "769M",
+        "vram": "~5GB",
+        "languages": "English only"
+    },
+    "large": {
+        "description": "Highest accuracy model, 1550M parameters",
+        "params": "1550M",
+        "vram": "~10GB",
+        "languages": "multilingual"
+    },
+    "large-v2": {
+        "description": "Improved large model, 1550M parameters",
+        "params": "1550M",
+        "vram": "~10GB", 
+        "languages": "multilingual"
+    },
+    "large-v3": {
+        "description": "Latest large model, 1550M parameters",
+        "params": "1550M",
+        "vram": "~10GB",
+        "languages": "multilingual"
+    },
+    "turbo": {
+        "description": "Optimized for speed, 809M parameters",
+        "params": "809M",
+        "vram": "~6GB",
+        "languages": "multilingual"
+    }
+}
 
 def signal_handler(signum: int, frame) -> None:
     """Handle CTRL+C (SIGINT) and SIGTERM gracefully."""
@@ -108,6 +183,7 @@ class Config:
     formats: list[str]
     input_path: str
     keep_audio: bool
+    model: str
     output_dir: Path
     overwrite_files: bool
     stdout_mode: bool
@@ -189,8 +265,10 @@ def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode:
         return extract_and_download_media(input_path, output_path, False, stdout_mode)
     return result
 
-def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, verbose_level: int, vprint_func: Callable[[str, int], None]) -> list[Path]:
+def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, verbose_level: int, vprint_func: Callable[[str, int], None], model_name: str = "base") -> list[Path]:
     """Transcribe audio to multiple formats."""
+    from faster_whisper import WhisperModel
+    
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
     
     # Suppress faster-whisper RuntimeWarnings during model loading and transcription
@@ -198,10 +276,10 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     if verbose_level < 2:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
-            model = WhisperModel("base", compute_type="auto")
+            model = WhisperModel(model_name, compute_type="auto")
             segments, info = model.transcribe(str(audio_file))
     else:
-        model = WhisperModel("base", compute_type="auto")
+        model = WhisperModel(model_name, compute_type="auto")
         segments, info = model.transcribe(str(audio_file))
 
     vprint_func("🎤 Starting transcription...")
@@ -226,27 +304,29 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     output_files = []
     for fmt in formats:
         output_file = base_output_path.with_suffix(f".{fmt}")
-        write_format(fmt, segments_list, output_file, title, source, info, verbose, vprint_func)
+        write_format(fmt, segments_list, output_file, title, source, info, verbose, vprint_func, model_name)
         output_files.append(output_file)
     
     return output_files
 
 
-def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str, verbose_level: int):
+def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str, verbose_level: int, model_name: str = "base"):
     """Transcribe audio directly to stdout in specified format."""
+    from faster_whisper import WhisperModel
+
     # Suppress faster-whisper RuntimeWarnings during model loading and transcription
     # unless in debug mode (-vv)
     if verbose_level < 2:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
-            model = WhisperModel("base", compute_type="auto")
+            model = WhisperModel(model_name, compute_type="auto")
             segments, info = model.transcribe(str(audio_file))
     else:
-        model = WhisperModel("base", compute_type="auto")
+        model = WhisperModel(model_name, compute_type="auto")
         segments, info = model.transcribe(str(audio_file))
 
     segments_list = list(segments)
-    write_format_to_stdout(format_type, segments_list, title, source, info)
+    write_format_to_stdout(format_type, segments_list, title, source, info, model_name)
 
 
 def check_ffmpeg(vprint_func: Callable[[str, int], None]):
@@ -383,7 +463,8 @@ def create_transcript_file(audio_file: Path, ctx: ProcessingContext, title: str)
         ctx.config.input_path, 
         ctx.config.verbose_level >= 1, 
         ctx.config.verbose_level, 
-        ctx.vprint
+        ctx.vprint,
+        ctx.config.model
     )
 
 
@@ -435,7 +516,7 @@ def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str) -> 
 def handle_stdout_output(ctx: ProcessingContext, audio_file: Path, title: str):
     """Handle stdout-based output."""
     format_type = ctx.config.formats[0]  # Already validated to be single format
-    transcribe_to_stdout(audio_file, format_type, title, ctx.config.input_path, ctx.config.verbose_level)
+    transcribe_to_stdout(audio_file, format_type, title, ctx.config.input_path, ctx.config.verbose_level, ctx.config.model)
 
 
 def process_audio(ctx: ProcessingContext) -> Result[None, str]:
@@ -462,13 +543,15 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("-o", "--output", help="Directory to save output files to (default: current directory)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite any existing transcript file without confirmation")
     parser.add_argument("--stdout", action="store_true", help="Output transcript to stdout only (no file written, all other output silenced)")
+    parser.add_argument("--model", help="Whisper model to use (default: small). Use --list-models to see available options")
+    parser.add_argument("--list-models", action="store_true", help="List available Whisper models and their characteristics")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}", help="Show program's version number and exit")
     return parser.parse_args()
 
 
 def validate_arguments(args: argparse.Namespace):
     """Validate parsed arguments."""
-    if not args.input and not any(arg in sys.argv for arg in ['--version', '-h', '--help']):
+    if not args.input and not any(arg in sys.argv for arg in ['--version', '-h', '--help', '--list-models']):
         parser = argparse.ArgumentParser()
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -504,6 +587,10 @@ def create_config(args: argparse.Namespace) -> Config:
     if custom_name and custom_name.endswith('.txt'):
         custom_name = custom_name[:-4]  # Remove .txt extension
     
+    model = args.model or "small"  # Default to "small" if no model specified
+    if model:
+        model = validate_model(model)
+    
     return Config(
         input_path=args.input,
         verbose_level=args.verbose,
@@ -512,7 +599,8 @@ def create_config(args: argparse.Namespace) -> Config:
         custom_name=custom_name,
         output_dir=output_dir,
         stdout_mode=args.stdout,
-        formats=parse_and_validate_formats(args.format, args.stdout)
+        formats=parse_and_validate_formats(args.format, args.stdout),
+        model=model
     )
 
 
@@ -532,6 +620,52 @@ def create_processing_context(config: Config) -> ProcessingContext:
     )
 
 
+def list_available_models() -> None:
+    """Display available Whisper models with their characteristics."""
+    print("🎤 Available Whisper Models:\n")
+    
+    # Group models by size for better display
+    model_groups = {
+        "Tiny Models": ["tiny", "tiny.en"],
+        "Base Models": ["base", "base.en"], 
+        "Small Models": ["small", "small.en"],
+        "Medium Models": ["medium", "medium.en"],
+        "Large Models": ["large-v3", "large", "turbo"]
+    }
+    
+    for group_name, models in model_groups.items():
+        print(f"📂 {group_name}:")
+        for model in models:
+            if model in AVAILABLE_MODELS:
+                info = AVAILABLE_MODELS[model]
+                print(f"   {model:<15} - {info['description']}")
+                print(f"                   📊 {info['params']} params, {info['vram']} VRAM, {info['languages']}")
+        print()
+    
+    print("💡 Usage examples:")
+    print("   voxtus video.mp4 --model tiny      # Fastest transcription")
+    print("   voxtus video.mp4 --model small     # Good balance (default)")
+    print("   voxtus video.mp4 --model large-v3  # Best accuracy")
+    print("   voxtus audio.mp3 --model small.en  # English-only, faster")
+
+
+def validate_model(model: str) -> str:
+    """Validate and normalize the model name."""
+    if model not in AVAILABLE_MODELS:
+        print(f"❌ Error: Unknown model '{model}'", file=sys.stderr)
+        print("\n📋 Available models:", file=sys.stderr)
+        for model_name in AVAILABLE_MODELS.keys():
+            print(f"   - {model_name}", file=sys.stderr)
+        print("\n💡 Use 'voxtus --list-models' to see detailed information", file=sys.stderr)
+        sys.exit(1)
+    
+    # Normalize "large" to "large-v3"
+    if model == "large":
+        return "large-v3"
+    
+    return model
+
+
 def main() -> None:
     """Main entry point."""
     global _cleanup_context
@@ -542,6 +676,12 @@ def main() -> None:
     
     try:
         args = parse_arguments()
+        
+        # Handle --list-models before other validation
+        if args.list_models:
+            list_available_models()
+            sys.exit(0)
+        
         validate_arguments(args)
         config = create_config(args)
         ctx = create_processing_context(config)
