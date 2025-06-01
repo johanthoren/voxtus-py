@@ -164,13 +164,18 @@ def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode:
         return extract_and_download_media(input_path, output_path, False, stdout_mode)
     return result
 
-def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, vprint_func: Callable[[str, int], None]) -> list[Path]:
+def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, verbose_level: int, vprint_func: Callable[[str, int], None]) -> list[Path]:
     """Transcribe audio to multiple formats."""
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
     
     # Suppress faster-whisper RuntimeWarnings during model loading and transcription
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
+    # unless in debug mode (-vv)
+    if verbose_level < 2:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            model = WhisperModel("base", compute_type="auto")
+            segments, info = model.transcribe(str(audio_file))
+    else:
         model = WhisperModel("base", compute_type="auto")
         segments, info = model.transcribe(str(audio_file))
 
@@ -202,11 +207,16 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     return output_files
 
 
-def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str):
+def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str, verbose_level: int):
     """Transcribe audio directly to stdout in specified format."""
     # Suppress faster-whisper RuntimeWarnings during model loading and transcription
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
+    # unless in debug mode (-vv)
+    if verbose_level < 2:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            model = WhisperModel("base", compute_type="auto")
+            segments, info = model.transcribe(str(audio_file))
+    else:
         model = WhisperModel("base", compute_type="auto")
         segments, info = model.transcribe(str(audio_file))
 
@@ -338,6 +348,7 @@ def create_transcript_file(audio_file: Path, ctx: ProcessingContext, title: str)
         title, 
         ctx.config.input_path, 
         ctx.config.verbose_level >= 1, 
+        ctx.config.verbose_level, 
         ctx.vprint
     )
 
@@ -390,7 +401,7 @@ def handle_file_output(ctx: ProcessingContext, audio_file: Path, title: str) -> 
 def handle_stdout_output(ctx: ProcessingContext, audio_file: Path, title: str):
     """Handle stdout-based output."""
     format_type = ctx.config.formats[0]  # Already validated to be single format
-    transcribe_to_stdout(audio_file, format_type, title, ctx.config.input_path)
+    transcribe_to_stdout(audio_file, format_type, title, ctx.config.input_path, ctx.config.verbose_level)
 
 
 def process_audio(ctx: ProcessingContext) -> Result[None, str]:

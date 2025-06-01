@@ -493,7 +493,7 @@ class TestTranscriptionProgress:
             base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
-            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, verbose_level=0, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Progress should be shown to stderr
@@ -525,7 +525,7 @@ class TestTranscriptionProgress:
             base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=1, stdout_mode=False)
-            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=True, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=True, verbose_level=1, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Progress should NOT be shown in verbose mode
@@ -561,7 +561,7 @@ class TestTranscriptionProgress:
             base_output = tmp_path / "output"
             
             vprint = create_print_wrapper(verbose_level=0, stdout_mode=False)
-            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, vprint_func=vprint)
+            transcribe_to_formats(audio_file, base_output, ["txt"], "test", "test.mp3", verbose=False, verbose_level=0, vprint_func=vprint)
         
         captured = capsys.readouterr()
         # Should show final 100% completion
@@ -590,7 +590,7 @@ class TestTranscriptionProgress:
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
             
-            transcribe_to_stdout(audio_file, "txt", "Test Title", "test.mp3")
+            transcribe_to_stdout(audio_file, "txt", "Test Title", "test.mp3", 0)
         
         captured = capsys.readouterr()
         # Stdout should only contain transcript
