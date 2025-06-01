@@ -1,0 +1,19 @@
+WEBVTT
+
+NOTE Title
+sample
+
+NOTE Source
+tests/data/sample.mp3
+
+NOTE Duration
+00:00:07.001
+
+NOTE Language
+en
+
+NOTE Model
+base
+
+00:00:00.000 --> 00:00:07.000
+Voxdust is a command line tool for transcribing internet videos or local audio files into readable text.
