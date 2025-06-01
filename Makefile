@@ -1,7 +1,7 @@
 # Voxtus Development Makefile
 # Uses uv for fast Python package management
 
-.PHONY: help install dev-install test test-ci release verify-uv verify-act
+.PHONY: help install dev-install test test-ci release verify-uv verify-act run
 
 # Default target
 help: ## Show this help message
@@ -52,6 +52,9 @@ test-coverage: verify-uv ## Run tests with coverage report
 
 test-ci: verify-act ## Run tests using act (GitHub Actions locally)
 	act -W .github/workflows/test.yml
+
+run: verify-uv ## Run development version with arguments (e.g., make run -- -f json file.mp4)
+	uv run python -m voxtus $(filter-out run,$(MAKECMDGOALS))
 
 # Release process
 release: verify-uv ## Bump version, commit, tag and push (args: patch|minor|major, default: patch)
@@ -144,4 +147,8 @@ release: verify-uv ## Bump version, commit, tag and push (args: patch|minor|majo
 
 # Allow version arguments to be treated as targets (prevents "No rule to make target" error)
 patch minor major:
+	@true 
+
+# Allow any arguments to be passed to run target
+%:
 	@true 

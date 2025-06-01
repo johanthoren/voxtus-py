@@ -78,6 +78,7 @@ The project uses a simple Makefile for development tasks. All targets automatica
 make help              # Show all available commands with dynamic version examples
 make install           # Install package and dependencies
 make dev-install       # Install with development dependencies
+make run               # Run development version (e.g., make run -- -f json file.mp4)
 make test              # Run tests (fast)
 make test-coverage     # Run tests with coverage report
 make test-ci           # Run GitHub Actions workflow locally (requires act)
