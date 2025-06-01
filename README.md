@@ -9,6 +9,7 @@ It supports multiple output formats and can download, transcribe, and optionally
 - 🎥 **Download & transcribe** videos from YouTube, Vimeo, and 1000+ sites
 - 📁 **Local file support** for audio/video files  
 - 📝 **Multiple output formats**: TXT, JSON, SRT, VTT
+- 🎛️ **Model selection** - Choose from tiny to large models for speed/accuracy trade-offs
 - 🔄 **Batch processing** multiple formats in one run
 - 📊 **Rich metadata** in JSON format (title, source, duration, language)
 - 🚀 **Stdout mode** for pipeline integration
@@ -161,6 +162,52 @@ Voxtus uses a modular format system that makes adding new output formats straigh
 
 ---
 
+## 🎛️ Model Selection
+
+Voxtus supports multiple Whisper models with different trade-offs between speed, accuracy, and resource usage:
+
+### Available Models
+
+| Model | Parameters | VRAM | Languages | Best For |
+|-------|------------|------|-----------|----------|
+| **tiny** | 39M | ~1GB | Multilingual | Fastest inference, low resources |
+| **tiny.en** | 39M | ~1GB | English only | Fastest English-only transcription |
+| **base** | 74M | ~1GB | Multilingual | Good balance for minimal resources |
+| **base.en** | 74M | ~1GB | English only | Balanced English-only |
+| **small** | 244M | ~2GB | Multilingual | **Default balance** |
+| **small.en** | 244M | ~2GB | English only | Higher accuracy English |
+| **medium** | 769M | ~5GB | Multilingual | Good accuracy, slower |
+| **medium.en** | 769M | ~5GB | English only | Good accuracy English |
+| **large** | 1550M | ~10GB | Multilingual | Highest accuracy |
+| **large-v2** | 1550M | ~10GB | Multilingual | Improved large model |
+| **large-v3** | 1550M | ~10GB | Multilingual | Latest large model |
+| **turbo** | 809M | ~6GB | Multilingual | Optimized for speed |
+
+*VRAM requirements are from OpenAI's official specifications. Actual performance varies by hardware and audio content.*
+
+### Model Selection Guide
+
+```bash
+# List all available models with characteristics
+voxtus --list-models
+
+# Speed-optimized (fastest)
+voxtus video.mp4 --model tiny
+
+# Balanced (default)
+voxtus video.mp4 --model small
+
+# Quality-optimized (most accurate)
+voxtus video.mp4 --model large-v3
+
+# English-only (faster for English content)
+voxtus video.mp4 --model small.en
+```
+
+**💡 Tip**: English-only models (`.en`) are faster and more accurate for English content, while multilingual models work with 99+ languages.
+
+---
+
 ## 🧪 Examples
 
 ### Basic Usage
@@ -203,6 +250,11 @@ voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
 
 # Overwrite existing files
 voxtus video.mp4 -f json --overwrite
+
+# Model selection for different use cases
+voxtus video.mp4 --model tiny -f txt    # Fast transcription
+voxtus video.mp4 --model large-v3       # Best quality
+voxtus podcast.mp3 --model small.en     # English podcast
 ```
 
 ### Real-world Examples
@@ -229,6 +281,8 @@ voxtus interview.mp4 -f txt,json -n "interview_2024"
 | `-o, --output DIR` | Output directory (default: current directory) |
 | `-v, --verbose` | Increase verbosity (-v, -vv for debug) |
 | `-k, --keep` | Keep the downloaded/converted audio file |
+| `--model MODEL` | Whisper model to use (default: small) |
+| `--list-models` | List available models and their characteristics |
 | `--overwrite` | Overwrite existing files without confirmation |
 | `--stdout` | Output to stdout (single format only) |
 | `--version` | Show version and exit |

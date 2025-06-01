@@ -265,8 +265,23 @@ def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode:
         return extract_and_download_media(input_path, output_path, False, stdout_mode)
     return result
 
-def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, verbose_level: int, vprint_func: Callable[[str, int], None], model_name: str = "base") -> list[Path]:
-    """Transcribe audio to multiple formats."""
+def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, verbose_level: int, vprint_func: Callable[[str, int], None], model_name: str = "small") -> list[Path]:
+    """Transcribe audio to multiple formats using specified Whisper model.
+    
+    Args:
+        audio_file: Path to the audio file to transcribe
+        base_output_path: Base path for output files (without extension)
+        formats: List of output formats to generate
+        title: Title for the transcript metadata
+        source: Source identifier for the media
+        verbose: Whether to show verbose output
+        verbose_level: Verbosity level (0=normal, 1=verbose, 2=debug)
+        vprint_func: Function for verbose printing
+        model_name: Whisper model to use (default: "small")
+        
+    Returns:
+        List of paths to the generated output files
+    """
     from faster_whisper import WhisperModel
     
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
@@ -310,8 +325,17 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
     return output_files
 
 
-def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str, verbose_level: int, model_name: str = "base"):
-    """Transcribe audio directly to stdout in specified format."""
+def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str, verbose_level: int, model_name: str = "small"):
+    """Transcribe audio directly to stdout in specified format using Whisper model.
+    
+    Args:
+        audio_file: Path to the audio file to transcribe
+        format_type: Output format (txt, json, srt, vtt)
+        title: Title for the transcript metadata
+        source: Source identifier for the media
+        verbose_level: Verbosity level (0=normal, 1=verbose, 2=debug)
+        model_name: Whisper model to use (default: "small")
+    """
     from faster_whisper import WhisperModel
 
     # Suppress faster-whisper RuntimeWarnings during model loading and transcription
