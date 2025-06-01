@@ -1,1 +1,1 @@
-[0.00 - 7.00]:  Voxdust is a command line tool for transcribing internet videos or local audio files into readable text. 
+[0.00 - 6.96]:  Voxtus is a command line tool for transcribing internet videos or local audio files into readable text.

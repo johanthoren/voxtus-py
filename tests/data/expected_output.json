@@ -1,17 +1,17 @@
 {
-    "transcript": [
-        {
-            "id": 1,
-            "start": 0.0,
-            "end": 7.0,
-            "text": " Voxdust is a command line tool for transcribing internet videos or local audio files into readable text."
-        }
-    ],
-    "metadata": {
-        "title": "sample",
-        "source": "tests/data/sample.mp3",
-        "duration": 7.0008125,
-        "model": "base",
-        "language": "en"
+  "transcript": [
+    {
+      "id": 1,
+      "start": 0.0,
+      "end": 6.96,
+      "text": " Voxtus is a command line tool for transcribing internet videos or local audio files into readable text."
     }
+  ],
+  "metadata": {
+    "title": "sample",
+    "source": "tests/data/sample.mp3",
+    "duration": 7.0008125,
+    "model": "small",
+    "language": "en"
+  }
 }

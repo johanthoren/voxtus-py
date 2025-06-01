@@ -13,8 +13,7 @@ NOTE Language
 en
 
 NOTE Model
-base
+small
 
-
-00:00:00.000 --> 00:00:07.000
-Voxdust is a command line tool for transcribing internet videos or local audio files into readable text. 
+00:00:00.000 --> 00:00:06.960
+Voxtus is a command line tool for transcribing internet videos or local audio files into readable text.

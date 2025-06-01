@@ -213,7 +213,7 @@ class TestCreateConfig:
     """Test the create_config function."""
     
     def test_basic_config_creation(self, tmp_path):
-        """Test creating config with basic arguments."""
+        """Test basic config creation from arguments."""
         args = argparse.Namespace(
             input="test.mp3",
             verbose=1,
@@ -222,7 +222,8 @@ class TestCreateConfig:
             format="txt",
             name=None,
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         config = create_config(args)
@@ -246,7 +247,8 @@ class TestCreateConfig:
             format="json",
             name="my_custom_name",
             output=str(tmp_path),
-            stdout=True
+            stdout=True,
+            model=None
         )
         
         config = create_config(args)
@@ -267,7 +269,8 @@ class TestCreateConfig:
             format="txt",
             name="my_file.txt",
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         config = create_config(args)
@@ -283,7 +286,8 @@ class TestCreateConfig:
             format="txt",
             name=None,
             output=None,
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         config = create_config(args)
@@ -302,7 +306,8 @@ class TestCreateConfig:
             format="txt",
             name=None,
             output=user_path,
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         config = create_config(args)
@@ -324,7 +329,8 @@ class TestCreateProcessingContext:
             custom_name=None,
             output_dir=tmp_path,
             stdout_mode=False,
-            formats=["txt"]
+            formats=["txt"],
+            model="small"
         )
         
         ctx = create_processing_context(config)
@@ -347,7 +353,8 @@ class TestCreateProcessingContext:
             custom_name="test",
             output_dir=tmp_path,
             stdout_mode=True,
-            formats=["json"]
+            formats=["json"],
+            model="small"
         )
         
         ctx = create_processing_context(config)
@@ -370,7 +377,8 @@ class TestCreateProcessingContext:
             custom_name=None,
             output_dir=tmp_path,
             stdout_mode=False,
-            formats=["txt"]
+            formats=["txt"],
+            model="small"
         )
         
         ctx1 = create_processing_context(config)
@@ -388,7 +396,8 @@ class TestCreateProcessingContext:
             custom_name=None,
             output_dir=tmp_path,
             stdout_mode=False,
-            formats=["txt"]
+            formats=["txt"],
+            model="small"
         )
         
         ctx1 = create_processing_context(config)
@@ -487,7 +496,7 @@ class TestTranscriptionProgress:
         mock_model.transcribe.return_value = ([mock_segment], mock_info)
         
         # Mock the WhisperModel constructor
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+        with patch('faster_whisper.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()  # Create empty file
             base_output = tmp_path / "output"
@@ -519,7 +528,7 @@ class TestTranscriptionProgress:
         mock_model.transcribe.return_value = ([mock_segment], mock_info)
         
         # Mock the WhisperModel constructor
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+        with patch('faster_whisper.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()  # Create empty file
             base_output = tmp_path / "output"
@@ -555,7 +564,7 @@ class TestTranscriptionProgress:
         mock_model.transcribe.return_value = (segments, mock_info)
         
         # Mock the WhisperModel constructor
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+        with patch('faster_whisper.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
             base_output = tmp_path / "output"
@@ -586,7 +595,7 @@ class TestTranscriptionProgress:
         mock_model.transcribe.return_value = ([mock_segment], mock_info)
         
         # Mock the WhisperModel constructor
-        with patch('voxtus.__main__.WhisperModel', return_value=mock_model):
+        with patch('faster_whisper.WhisperModel', return_value=mock_model):
             audio_file = tmp_path / "test.mp3"
             audio_file.touch()
             
@@ -706,7 +715,7 @@ class TestJSONFormat:
         output_file = tmp_path / "test.json"
         vprint = lambda msg, level=0: None
         
-        write_format("json", segments, output_file, "Test Title", "test.mp3", mock_info, False, vprint)
+        write_format("json", segments, output_file, "Test Title", "test.mp3", mock_info, False, vprint, "base")
         
         # Read and parse the JSON
         with open(output_file) as f:
@@ -750,7 +759,7 @@ class TestJSONFormat:
         output_file = tmp_path / "test.txt"
         vprint = lambda msg, level=0: None
         
-        write_format("txt", segments, output_file, "Test Title", "test.mp3", None, False, vprint)
+        write_format("txt", segments, output_file, "Test Title", "test.mp3", None, False, vprint, "base")
         
         # Read the file
         with open(output_file) as f:
@@ -776,7 +785,8 @@ class TestFormatArguments:
             format="txt,json",
             name=None,
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         from voxtus.__main__ import create_config
@@ -794,7 +804,8 @@ class TestFormatArguments:
             format="txt",  # This is the default from argparse
             name=None,
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         from voxtus.__main__ import create_config
@@ -812,7 +823,8 @@ class TestFormatArguments:
             format="txt,json,srt",
             name=None,
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         from voxtus.__main__ import create_config
@@ -830,7 +842,8 @@ class TestFormatArguments:
             format="srt",
             name=None,
             output=str(tmp_path),
-            stdout=False
+            stdout=False,
+            model=None
         )
         
         from voxtus.__main__ import create_config
@@ -906,7 +919,7 @@ class TestSRTFormat:
         output_file = tmp_path / "test.srt"
         vprint = lambda msg, level=0: None
         
-        write_format("srt", segments, output_file, "Test Title", "test.mp4", None, False, vprint)
+        write_format("srt", segments, output_file, "Test Title", "test.mp4", None, False, vprint, "base")
         
         # Read the file
         with open(output_file, encoding="utf-8") as f:
@@ -916,7 +929,7 @@ class TestSRTFormat:
         expected_content = (
             "1\n00:00:00,000 --> 00:00:02,000\nSubtitle 1\n\n"
             "2\n00:00:02,000 --> 00:00:04,000\nSubtitle 2\n\n"
-            "3\n00:00:04,000 --> 00:00:06,000\nSubtitle 3\n\n"
+            "3\n00:00:04,000 --> 00:00:06,000\nSubtitle 3\n"
         )
         assert content == expected_content
     
@@ -935,13 +948,13 @@ class TestSRTFormat:
         output_file = tmp_path / "test_long.srt"
         vprint = lambda msg, level=0: None
         
-        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint)
+        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint, "base")
         
         with open(output_file, encoding="utf-8") as f:
             content = f.read()
         
         expected_content = (
-            "1\n01:01:01,500 --> 01:01:05,000\nLong duration subtitle\n\n"
+            "1\n01:01:01,500 --> 01:01:05,000\nLong duration subtitle\n"
         )
         assert content == expected_content
     
@@ -960,12 +973,12 @@ class TestSRTFormat:
             segment.text = f"Line {i + 1}"
             segments.append(segment)
         
-        write_format_to_stdout("srt", segments, "Test Title", "test.mp4", None)
+        write_format_to_stdout("srt", segments, "Test Title", "test.mp4", None, "base")
         
         captured = capsys.readouterr()
         expected_output = (
             "1\n00:00:00,000 --> 00:00:01,500\nLine 1\n\n"
-            "2\n00:00:01,500 --> 00:00:03,000\nLine 2\n\n"
+            "2\n00:00:01,500 --> 00:00:03,000\nLine 2\n"
         )
         assert captured.out == expected_output
     
@@ -984,7 +997,7 @@ class TestSRTFormat:
         output_file = tmp_path / "test_unicode.srt"
         vprint = lambda msg, level=0: None
         
-        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint)
+        write_format("srt", [segment], output_file, "Test", "test.mp4", None, False, vprint, "base")
         
         # Read with explicit UTF-8 encoding
         with open(output_file, encoding="utf-8") as f:
@@ -1015,7 +1028,7 @@ class TestSRTFormat:
         
         output_file = tmp_path / "test_verbose.srt"
         
-        write_format("srt", segments, output_file, "Test", "test.mp4", None, True, mock_vprint)
+        write_format("srt", segments, output_file, "Test", "test.mp4", None, True, mock_vprint, "base")
         
         # Check that verbose messages were logged
         assert any("SRT segment 1: 0.00s - 1.00s" in call[0] for call in vprint_calls)
@@ -1155,7 +1168,7 @@ class TestVTTFormat:
         output_file = tmp_path / "test.vtt"
         vprint = lambda msg, level=0: None
         
-        write_format("vtt", segments, output_file, "Test Title", "test.mp4", info, False, vprint)
+        write_format("vtt", segments, output_file, "Test Title", "test.mp4", info, False, vprint, "base")
         
         # Read the file
         with open(output_file, encoding="utf-8") as f:
@@ -1192,7 +1205,7 @@ class TestVTTFormat:
         output_file = tmp_path / "test_long.vtt"
         vprint = lambda msg, level=0: None
         
-        write_format("vtt", [segment], output_file, "Test", "test.mp4", info, False, vprint)
+        write_format("vtt", [segment], output_file, "Test", "test.mp4", info, False, vprint, "base")
         
         with open(output_file, encoding="utf-8") as f:
             content = f.read()
@@ -1220,7 +1233,7 @@ class TestVTTFormat:
         info.duration = 3.0
         info.language = "en"
         
-        write_format_to_stdout("vtt", segments, "Test Title", "test.mp4", info)
+        write_format_to_stdout("vtt", segments, "Test Title", "test.mp4", info, "base")
         
         captured = capsys.readouterr()
         
@@ -1253,7 +1266,7 @@ class TestVTTFormat:
         output_file = tmp_path / "test_unicode.vtt"
         vprint = lambda msg, level=0: None
         
-        write_format("vtt", [segment], output_file, "Unicode Test", "test.mp4", info, False, vprint)
+        write_format("vtt", [segment], output_file, "Unicode Test", "test.mp4", info, False, vprint, "base")
         
         # Read with explicit UTF-8 encoding
         with open(output_file, encoding="utf-8") as f:
@@ -1290,7 +1303,7 @@ class TestVTTFormat:
         
         output_file = tmp_path / "test_verbose.vtt"
         
-        write_format("vtt", segments, output_file, "Test", "test.mp4", info, True, mock_vprint)
+        write_format("vtt", segments, output_file, "Test", "test.mp4", info, True, mock_vprint, "base")
         
         # Check that verbose messages were logged
         assert any("VTT segment 1: 0.00s - 1.00s" in call[0] for call in vprint_calls)
