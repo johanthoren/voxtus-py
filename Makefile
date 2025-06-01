@@ -44,11 +44,11 @@ dev-install: verify-uv ## Install package in development mode with dev dependenc
 	uv pip install -e ".[dev]"
 
 # Testing
-test: verify-uv ## Run tests
-	uv run pytest
+test: verify-uv ## Run tests with optional arguments (e.g., make test -- -k "test_name")
+	uv run pytest $(filter-out test,$(MAKECMDGOALS))
 
-test-coverage: verify-uv ## Run tests with coverage report
-	uv run pytest --cov=voxtus --cov-report=term-missing
+test-coverage: verify-uv ## Run tests with coverage report and optional arguments (e.g., make test-coverage -- -k "test_name")
+	uv run pytest --cov=voxtus --cov-report=term-missing $(filter-out test-coverage,$(MAKECMDGOALS))
 
 test-ci: verify-act ## Run tests using act (GitHub Actions locally)
 	act -W .github/workflows/test.yml
