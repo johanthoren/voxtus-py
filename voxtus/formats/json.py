@@ -7,6 +7,7 @@ Each segment includes sequential IDs for easy reference.
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Callable, List
 
@@ -16,9 +17,9 @@ from . import FormatWriter, register_format
 class JsonFormatWriter(FormatWriter):
     """Writer for JSON format output."""
     
-    def write(self, segments: List[Any], output_file: Path, title: str, source: str, info: Any, verbose: bool, vprint_func: Callable[[str, int], None]) -> None:
-        """Write transcript in JSON format with metadata."""
-        transcript_data = {
+    def _create_transcript_data(self, segments: List[Any], title: str, source: str, info: Any, model: str = "base") -> dict:
+        """Create the complete transcript data structure."""
+        return {
             "transcript": [
                 {
                     "id": i + 1,
@@ -32,10 +33,14 @@ class JsonFormatWriter(FormatWriter):
                 "title": title,
                 "source": source,
                 "duration": info.duration if hasattr(info, 'duration') else None,
-                "model": "base",
+                "model": model,
                 "language": info.language if hasattr(info, 'language') else "en"
             }
         }
+    
+    def write(self, segments: List[Any], output_file: Path, title: str, source: str, info: Any, verbose: bool, vprint_func: Callable[[str, int], None], model: str = "base") -> None:
+        """Write transcript in JSON format with metadata."""
+        transcript_data = self._create_transcript_data(segments, title, source, info, model)
         
         with output_file.open("w", encoding="utf-8") as f:
             json.dump(transcript_data, f, indent=2, ensure_ascii=False)
@@ -43,27 +48,10 @@ class JsonFormatWriter(FormatWriter):
         if verbose:
             vprint_func(f"JSON format written with {len(transcript_data['transcript'])} segments", 1)
     
-    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any, model: str = "base") -> None:
         """Write transcript to stdout in JSON format."""
-        transcript_data = {
-            "transcript": [
-                {
-                    "id": i + 1,
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text
-                }
-                for i, segment in enumerate(segments)
-            ],
-            "metadata": {
-                "title": title,
-                "source": source, 
-                "duration": info.duration if hasattr(info, 'duration') else None,
-                "model": "base",
-                "language": info.language if hasattr(info, 'language') else "en"
-            }
-        }
-        print(json.dumps(transcript_data, indent=2, ensure_ascii=False))
+        transcript_data = self._create_transcript_data(segments, title, source, info, model)
+        sys.stdout.write(json.dumps(transcript_data, indent=2, ensure_ascii=False) + "\n")
 
 
 # Register the format

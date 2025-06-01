@@ -6,6 +6,7 @@ and subtitle editing software. Each segment becomes a subtitle with sequential
 numbering and proper HH:MM:SS,mmm timestamp formatting.
 """
 
+import sys
 from pathlib import Path
 from typing import Any, Callable, List
 
@@ -34,23 +35,36 @@ def format_srt_segment(segment, segment_number: int) -> str:
 class SrtFormatWriter(FormatWriter):
     """Writer for SRT subtitle format output."""
     
-    def write(self, segments: List[Any], output_file: Path, title: str, source: str, info: Any, verbose: bool, vprint_func: Callable[[str, int], None]) -> None:
-        """Write transcript in SRT format."""
-        with output_file.open("w", encoding="utf-8") as f:
-            for i, segment in enumerate(segments, 1):
-                srt_block = format_srt_segment(segment, i)
-                f.write(srt_block + "\n")
-                if verbose:
-                    vprint_func(f"SRT segment {i}: {segment.start:.2f}s - {segment.end:.2f}s", 2)
+    def _format_complete_output(self, segments: List[Any]) -> str:
+        """Format complete SRT output as a string."""
+        blocks = []
         
-        if verbose:
-            vprint_func(f"SRT format written with {len(segments)} subtitle segments", 1)
-    
-    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any) -> None:
-        """Write transcript to stdout in SRT format."""
         for i, segment in enumerate(segments, 1):
             srt_block = format_srt_segment(segment, i)
-            print(srt_block)
+            blocks.append(srt_block.rstrip())  # Remove trailing newline from individual block
+            
+            # Add separator between subtitle blocks, but not after the last one
+            if i < len(segments):
+                blocks.append("")  # Blank line between blocks
+        
+        return "\n".join(blocks)
+    
+    def write(self, segments: List[Any], output_file: Path, title: str, source: str, info: Any, verbose: bool, vprint_func: Callable[[str, int], None], model: str = "base") -> None:
+        """Write transcript in SRT format."""
+        content = self._format_complete_output(segments)
+        
+        with output_file.open("w", encoding="utf-8") as f:
+            f.write(content + "\n")  # Add final newline
+                    
+        if verbose:
+            vprint_func(f"SRT format written with {len(segments)} subtitle segments", 1)
+            for i, segment in enumerate(segments, 1):
+                vprint_func(f"SRT segment {i}: {segment.start:.2f}s - {segment.end:.2f}s", 2)
+    
+    def write_to_stdout(self, segments: List[Any], title: str, source: str, info: Any, model: str = "base") -> None:
+        """Write transcript to stdout in SRT format."""
+        content = self._format_complete_output(segments)
+        sys.stdout.write(content + "\n")  # Add final newline
 
 
 # Register the format
