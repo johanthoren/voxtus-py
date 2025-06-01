@@ -1,9 +1,13 @@
 import subprocess
 from pathlib import Path
 
-from . import (EXPECTED_OUTPUT_MP3, EXPECTED_OUTPUT_MP4, change_directory,
-               get_free_port, validate_no_runtime_warnings, validate_result,
+from . import (EXPECTED_OUTPUT_MP3, EXPECTED_OUTPUT_MP4, TEST_MODEL,
+               change_directory, get_free_port, run_voxtus_with_timeout,
+               validate_no_runtime_warnings, validate_result,
                validate_stdout_result)
+
+# CI environments may be slower, so use generous timeout
+CI_TIMEOUT = 120  # 2 minutes for model loading and transcription
 
 
 def test_transcribe_local_file(tmp_path):
@@ -12,11 +16,9 @@ def test_transcribe_local_file(tmp_path):
     output_dir = tmp_path
     name = "sample"
 
-    result = subprocess.run(
-        ["voxtus", "-n", name, "-o", str(output_dir), str(test_data)],
-        capture_output=True,
-        text=True,
-    )
+    result = run_voxtus_with_timeout([
+        "voxtus", "--model", TEST_MODEL, "-n", name, "-o", str(output_dir), str(test_data)
+    ])
 
     validate_result(result, output_dir, name)
     # Validate that no RuntimeWarnings appear in normal mode (our warning suppression works)
@@ -26,12 +28,9 @@ def test_stdout_mode(tmp_path):
     """Test stdout mode functionality."""
     test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
     
-    result = subprocess.run(
-        ["voxtus", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path)  # Run in temp directory to verify no files are created
-    )
+    result = run_voxtus_with_timeout([
+        "voxtus", "--model", TEST_MODEL, "--stdout", str(test_data)
+    ], cwd=str(tmp_path))  # Run in temp directory to verify no files are created
     
     validate_stdout_result(result)
     
@@ -80,11 +79,9 @@ def test_http_url_processing(tmp_path):
 
         try:
             url = f"http://localhost:{port}/sample_video.mp4"
-            result = subprocess.run(
-                ["voxtus", "-n", name, "-o", str(output_dir), url],
-                capture_output=True,
-                text=True,
-            )
+            result = run_voxtus_with_timeout([
+                "voxtus", "--model", TEST_MODEL, "-n", name, "-o", str(output_dir), url
+            ])
 
             validate_result_mp4(result, output_dir, name)
 
@@ -98,23 +95,18 @@ def test_output_consistency(tmp_path):
     test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
     
     # Run in normal mode
-    normal_result = subprocess.run(
-        ["voxtus", "-n", "test", "-o", str(tmp_path), str(test_data)],
-        capture_output=True,
-        text=True
-    )
+    normal_result = run_voxtus_with_timeout([
+        "voxtus", "--model", TEST_MODEL, "-n", "test", "-o", str(tmp_path), str(test_data)
+    ])
     
     # Create stdout test directory
     stdout_test_dir = tmp_path / "stdout_test"
     stdout_test_dir.mkdir(exist_ok=True)
     
     # Run in stdout mode  
-    stdout_result = subprocess.run(
-        ["voxtus", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True,
-        cwd=str(stdout_test_dir)  # Different directory
-    )
+    stdout_result = run_voxtus_with_timeout([
+        "voxtus", "--model", TEST_MODEL, "--stdout", str(test_data)
+    ], cwd=str(stdout_test_dir))  # Different directory
     
     # Both should succeed
     assert normal_result.returncode == 0

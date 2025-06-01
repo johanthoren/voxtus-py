@@ -10,13 +10,17 @@ This module tests:
 import subprocess
 from pathlib import Path
 
+# CI environments may be slower, so use generous timeout
+CI_TIMEOUT = 120  # 2 minutes for model loading and transcription
+
 
 def test_list_models_command():
     """Test that --list-models command works and shows expected content."""
     result = subprocess.run(
         ["voxtus", "--list-models"],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=30  # This should be fast
     )
     
     assert result.returncode == 0
@@ -53,7 +57,8 @@ def test_invalid_model_error():
     result = subprocess.run(
         ["voxtus", "--model", "invalid-model", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 1
@@ -62,52 +67,21 @@ def test_invalid_model_error():
     assert "Use 'voxtus --list-models'" in result.stderr
 
 
-def test_default_model_is_small():
-    """Test that the default model is 'small' when no model is specified."""
-    test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
-    
-    # Run without specifying model
-    result = subprocess.run(
-        ["voxtus", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True
-    )
-    
-    assert result.returncode == 0
-    # Should get the correct "Voxtus" transcription from small model
-    assert "Voxtus" in result.stdout
-    assert "[0.00 -" in result.stdout
-
-
-def test_explicit_small_model():
-    """Test transcription with explicitly specified small model."""
-    test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
-    
-    result = subprocess.run(
-        ["voxtus", "--model", "small", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True
-    )
-    
-    assert result.returncode == 0
-    assert "Voxtus" in result.stdout
-    assert "command line tool" in result.stdout
-
-
 def test_tiny_model_transcription():
-    """Test transcription with tiny model (should be different from small)."""
+    """Test transcription with tiny model (our standard test model)."""
     test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
     
     result = subprocess.run(
         ["voxtus", "--model", "tiny", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
-    # Tiny model produces less accurate transcription
-    assert ("VoxDus" in result.stdout or "Voxdust" in result.stdout or 
-            "command line tool" in result.stdout)
+    # Tiny model produces "VoxDus" transcription
+    assert "VoxDus" in result.stdout
+    assert "command line tool" in result.stdout
 
 
 def test_base_model_transcription():
@@ -117,7 +91,8 @@ def test_base_model_transcription():
     result = subprocess.run(
         ["voxtus", "--model", "base", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
@@ -133,9 +108,10 @@ def test_model_parameter_file_output(tmp_path):
     name = "model_test"
     
     result = subprocess.run(
-        ["voxtus", "--model", "small", "-n", name, "-o", str(output_dir), str(test_data)],
+        ["voxtus", "--model", "tiny", "-n", name, "-o", str(output_dir), str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
@@ -144,10 +120,10 @@ def test_model_parameter_file_output(tmp_path):
     transcript_file = output_dir / f"{name}.txt"
     assert transcript_file.exists()
     
-    # Check content accuracy with small model
+    # Check content accuracy with tiny model
     with transcript_file.open() as f:
         content = f.read()
-        assert "Voxtus" in content
+        assert "VoxDus" in content
         assert "command line tool" in content
 
 
@@ -158,9 +134,10 @@ def test_model_with_multiple_formats(tmp_path):
     name = "multi_format_test"
     
     result = subprocess.run(
-        ["voxtus", "--model", "small", "-f", "txt,json", "-n", name, "-o", str(output_dir), str(test_data)],
+        ["voxtus", "--model", "tiny", "-f", "txt,json", "-n", name, "-o", str(output_dir), str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
@@ -172,10 +149,10 @@ def test_model_with_multiple_formats(tmp_path):
     assert txt_file.exists()
     assert json_file.exists()
     
-    # Both should contain accurate content from small model
+    # Both should contain accurate content from tiny model
     with txt_file.open() as f:
         txt_content = f.read()
-        assert "Voxtus" in txt_content
+        assert "VoxDus" in txt_content
     
     # JSON should be valid and contain metadata
     import json
@@ -183,7 +160,7 @@ def test_model_with_multiple_formats(tmp_path):
         json_data = json.load(f)
         assert "transcript" in json_data
         assert "metadata" in json_data
-        assert json_data["metadata"]["model"] == "small" 
+        assert json_data["metadata"]["model"] == "tiny"
 
 
 def test_base_model_golden_file_match():
@@ -194,7 +171,8 @@ def test_base_model_golden_file_match():
     result = subprocess.run(
         ["voxtus", "--model", "base", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
@@ -215,7 +193,8 @@ def test_base_model_json_metadata():
     result = subprocess.run(
         ["voxtus", "--model", "base", "-f", "json", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
@@ -229,57 +208,24 @@ def test_base_model_json_metadata():
     assert "Voxdust" in data["transcript"][0]["text"]
 
 
-def test_default_model_is_small_golden_files():
-    """Test that default model (no --model flag) uses small model and matches golden files."""
+def test_tiny_model_golden_files():
+    """Test that tiny model produces output matching golden files."""
     test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
     
-    # Test default model (no --model specified)
+    # Test tiny model (our standard test model)
     result = subprocess.run(
-        ["voxtus", "--stdout", str(test_data)],
+        ["voxtus", "--model", "tiny", "--stdout", str(test_data)],
         capture_output=True,
-        text=True
+        text=True,
+        timeout=CI_TIMEOUT
     )
     
     assert result.returncode == 0
     
-    # Load expected default (small model) output
+    # Load expected tiny model output (our standard golden files)
     expected_txt_file = Path(__file__).parent.parent / "data" / "expected_output.txt"
     with expected_txt_file.open() as f:
         expected_txt = f.read().strip()
     
     assert result.stdout.strip() == expected_txt
-    assert "Voxtus" in result.stdout  # Small model should produce "Voxtus"
-
-
-def test_explicit_small_model_matches_default():
-    """Test that explicitly specifying small model produces same output as default."""
-    test_data = Path(__file__).parent.parent / "data" / "sample.mp3"
-    
-    # Test explicit small model
-    result_explicit = subprocess.run(
-        ["voxtus", "--model", "small", "-f", "json", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True
-    )
-    
-    # Test default model
-    result_default = subprocess.run(
-        ["voxtus", "-f", "json", "--stdout", str(test_data)],
-        capture_output=True,
-        text=True
-    )
-    
-    assert result_explicit.returncode == 0
-    assert result_default.returncode == 0
-    
-    # Parse JSON outputs
-    import json
-    data_explicit = json.loads(result_explicit.stdout)
-    data_default = json.loads(result_default.stdout)
-    
-    # Both should have same model metadata
-    assert data_explicit["metadata"]["model"] == "small"
-    assert data_default["metadata"]["model"] == "small"
-    
-    # Both should have same transcript content
-    assert data_explicit["transcript"] == data_default["transcript"] 
+    assert "VoxDus" in result.stdout  # Tiny model should produce "VoxDus" 

@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from . import EXPECTED_OUTPUT_MP3
+from . import EXPECTED_OUTPUT_MP3, TEST_MODEL
 
 
 class TestWarningsIntegration:
@@ -10,7 +10,7 @@ class TestWarningsIntegration:
     def test_warnings_suppressed_in_normal_mode_integration(self):
         """Test warnings suppression in normal mode (integration test)."""
         result = subprocess.run(
-            ["voxtus", "-f", "txt", "--stdout", "tests/data/sample.mp3"],
+            ["voxtus", "--model", TEST_MODEL, "-f", "txt", "--stdout", "tests/data/sample.mp3"],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).parent.parent.parent)
@@ -28,7 +28,7 @@ class TestWarningsIntegration:
     def test_warnings_visible_in_debug_mode_integration(self):
         """Test warnings are visible in debug mode (integration test)."""
         result = subprocess.run(
-            ["voxtus", "-vv", "-f", "txt", "--stdout", "tests/data/sample.mp3"],
+            ["voxtus", "--model", TEST_MODEL, "-vv", "-f", "txt", "--stdout", "tests/data/sample.mp3"],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).parent.parent.parent)
