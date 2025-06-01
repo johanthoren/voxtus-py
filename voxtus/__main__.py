@@ -60,6 +60,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, TypeVar, Union
@@ -166,8 +167,12 @@ def download_audio(input_path: str, output_path: Path, debug: bool, stdout_mode:
 def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: list[str], title: str, source: str, verbose: bool, vprint_func: Callable[[str, int], None]) -> list[Path]:
     """Transcribe audio to multiple formats."""
     vprint_func("⏳ Loading transcription model (this may take a few seconds the first time)...")
-    model = WhisperModel("base", compute_type="auto")
-    segments, info = model.transcribe(str(audio_file))
+    
+    # Suppress faster-whisper RuntimeWarnings during model loading and transcription
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        model = WhisperModel("base", compute_type="auto")
+        segments, info = model.transcribe(str(audio_file))
 
     vprint_func("🎤 Starting transcription...")
     total_duration = info.duration if hasattr(info, 'duration') else None
@@ -199,8 +204,11 @@ def transcribe_to_formats(audio_file: Path, base_output_path: Path, formats: lis
 
 def transcribe_to_stdout(audio_file: Path, format_type: str, title: str, source: str):
     """Transcribe audio directly to stdout in specified format."""
-    model = WhisperModel("base", compute_type="auto")
-    segments, info = model.transcribe(str(audio_file))
+    # Suppress faster-whisper RuntimeWarnings during model loading and transcription
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        model = WhisperModel("base", compute_type="auto")
+        segments, info = model.transcribe(str(audio_file))
 
     segments_list = list(segments)
     write_format_to_stdout(format_type, segments_list, title, source, info)
