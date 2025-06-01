@@ -47,6 +47,15 @@ dev-install: verify-uv ## Install package in development mode with dev dependenc
 test: verify-uv ## Run tests with optional arguments (e.g., make test -- -k "test_name")
 	uv run pytest $(filter-out test,$(MAKECMDGOALS))
 
+test-unit: verify-uv ## Run unit tests only
+	uv run pytest tests/unit/ $(filter-out test-unit,$(MAKECMDGOALS))
+
+test-integration: verify-uv ## Run integration tests only
+	uv run pytest tests/integration/ $(filter-out test-integration,$(MAKECMDGOALS))
+
+test-regression: verify-uv ## Run regression tests only
+	uv run pytest tests/regression/ $(filter-out test-regression,$(MAKECMDGOALS))
+
 test-coverage: verify-uv ## Run tests with coverage report and optional arguments (e.g., make test-coverage -- -k "test_name")
 	uv run pytest --cov=voxtus --cov-report=term-missing $(filter-out test-coverage,$(MAKECMDGOALS))
 
