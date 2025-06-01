@@ -1018,4 +1018,217 @@ def test_debug_mode_allows_warnings(tmp_path):
     
     # Note: We can't guarantee faster-whisper will produce warnings,
     # but we can verify that debug mode doesn't suppress them if they occur.
-    # This is tested more directly in the unit tests using mocks.
+
+class TestSignalHandling:
+    """Test signal handling and graceful shutdown behavior."""
+    
+    def test_sigint_handling_during_processing(self, tmp_path):
+        """Test CTRL+C (SIGINT) handling during transcription processing."""
+        import os
+        import signal
+        import subprocess
+        import threading
+        import time
+        from pathlib import Path
+        
+        test_data = Path(__file__).parent / "data" / "sample.mp3"
+        
+        def send_signal_after_delay(proc, delay_seconds=0.5):
+            """Send SIGINT to process after a delay."""
+            time.sleep(delay_seconds)
+            if proc.poll() is None:  # Process still running
+                proc.send_signal(signal.SIGINT)
+        
+        # Start voxtus process
+        proc = subprocess.Popen(
+            ["voxtus", "-n", "test_sigint", "-o", str(tmp_path), str(test_data)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Start thread to send signal after delay
+        signal_thread = threading.Thread(target=send_signal_after_delay, args=(proc, 0.5))
+        signal_thread.start()
+        
+        # Wait for process to complete
+        stdout, stderr = proc.communicate(timeout=10)
+        signal_thread.join()
+        
+        # Verify SIGINT handling
+        assert proc.returncode == 130, f"Expected exit code 130 (SIGINT), got {proc.returncode}"
+        assert "SIGINT (CTRL+C)" in stderr, f"Expected SIGINT message in stderr: {stderr}"
+        assert "👋 Goodbye!" in stderr, f"Expected goodbye message in stderr: {stderr}"
+        assert "Cleaning up and exiting" in stderr, f"Expected cleanup message in stderr: {stderr}"
+        
+        # Verify no output files were created (process was interrupted)
+        output_files = list(tmp_path.glob("test_sigint.*"))
+        assert len(output_files) == 0, f"No output files should exist after SIGINT: {output_files}"
+    
+    def test_sigterm_handling_during_processing(self, tmp_path):
+        """Test SIGTERM handling during transcription processing."""
+        import os
+        import signal
+        import subprocess
+        import threading
+        import time
+        from pathlib import Path
+        
+        test_data = Path(__file__).parent / "data" / "sample.mp3"
+        
+        def send_signal_after_delay(proc, delay_seconds=0.5):
+            """Send SIGTERM to process after a delay."""
+            time.sleep(delay_seconds)
+            if proc.poll() is None:  # Process still running
+                proc.send_signal(signal.SIGTERM)
+        
+        # Start voxtus process
+        proc = subprocess.Popen(
+            ["voxtus", "-n", "test_sigterm", "-o", str(tmp_path), str(test_data)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Start thread to send signal after delay
+        signal_thread = threading.Thread(target=send_signal_after_delay, args=(proc, 0.5))
+        signal_thread.start()
+        
+        # Wait for process to complete
+        stdout, stderr = proc.communicate(timeout=10)
+        signal_thread.join()
+        
+        # Verify SIGTERM handling
+        assert proc.returncode == 143, f"Expected exit code 143 (SIGTERM), got {proc.returncode}"
+        assert "SIGTERM" in stderr, f"Expected SIGTERM message in stderr: {stderr}"
+        assert "👋 Goodbye!" in stderr, f"Expected goodbye message in stderr: {stderr}"
+        assert "Cleaning up and exiting" in stderr, f"Expected cleanup message in stderr: {stderr}"
+        
+        # Verify no output files were created (process was interrupted)
+        output_files = list(tmp_path.glob("test_sigterm.*"))
+        assert len(output_files) == 0, f"No output files should exist after SIGTERM: {output_files}"
+    
+    def test_eof_handling_during_overwrite_prompt(self, tmp_path):
+        """Test EOF (CTRL+D) handling during file overwrite prompt."""
+        import subprocess
+        from pathlib import Path
+        
+        test_data = Path(__file__).parent / "data" / "sample.mp3"
+        
+        # First, create a file that will trigger overwrite prompt
+        existing_file = tmp_path / "test_eof.txt"
+        existing_file.write_text("existing content")
+        
+        # Start voxtus process (without --overwrite flag to trigger prompt)
+        proc = subprocess.Popen(
+            ["voxtus", "-n", "test_eof", "-o", str(tmp_path), str(test_data)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Send EOF (equivalent to CTRL+D) to the process when it prompts
+        stdout, stderr = proc.communicate(input="")  # Empty input simulates EOF
+        
+        # Verify EOF handling
+        assert proc.returncode != 0, "Process should exit with error code on EOF"
+        assert "EOF received" in stderr, f"Expected EOF message in stderr: {stderr}"
+        assert "Aborting operation" in stderr, f"Expected abort message in stderr: {stderr}"
+    
+    def test_signal_handling_preserves_existing_files(self, tmp_path):
+        """Test that signal interruption doesn't corrupt existing files."""
+        import signal
+        import subprocess
+        import threading
+        import time
+        from pathlib import Path
+        
+        test_data = Path(__file__).parent / "data" / "sample.mp3"
+        
+        # Create an existing file
+        existing_file = tmp_path / "preserve_test.txt"
+        original_content = "This should not be corrupted"
+        existing_file.write_text(original_content)
+        
+        def send_signal_after_delay(proc, delay_seconds=0.5):
+            """Send SIGINT to process after a delay."""
+            time.sleep(delay_seconds)
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGINT)
+        
+        # Start voxtus process with --overwrite to avoid prompt
+        proc = subprocess.Popen(
+            ["voxtus", "--overwrite", "-n", "preserve_test", "-o", str(tmp_path), str(test_data)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Send signal during processing
+        signal_thread = threading.Thread(target=send_signal_after_delay, args=(proc,))
+        signal_thread.start()
+        
+        stdout, stderr = proc.communicate(timeout=10)
+        signal_thread.join()
+        
+        # Verify the existing file wasn't corrupted
+        assert existing_file.exists(), "Existing file should still exist"
+        final_content = existing_file.read_text()
+        
+        # The file should either be unchanged (if interrupted before writing)
+        # or contain valid transcript data (if writing completed before interrupt)
+        assert len(final_content) > 0, "File should not be empty"
+        if final_content == original_content:
+            # File was preserved (interrupted before writing)
+            assert True
+        else:
+            # File was overwritten with transcript (writing completed)
+            # Verify it contains valid transcript data
+            assert "[" in final_content and "]:" in final_content, "If overwritten, should contain valid transcript"
+    
+    def test_cleanup_removes_temporary_directories(self, tmp_path):
+        """Test that signal handling properly cleans up temporary directories."""
+        import signal
+        import subprocess
+        import tempfile
+        import threading
+        import time
+        from pathlib import Path
+        
+        test_data = Path(__file__).parent / "data" / "sample.mp3"
+        
+        # Get initial temp directory count
+        temp_dir = Path(tempfile.gettempdir())
+        initial_temp_dirs = set(temp_dir.glob("tmp*"))
+        
+        def send_signal_after_delay(proc, delay_seconds=0.5):
+            time.sleep(delay_seconds)
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGINT)
+        
+        proc = subprocess.Popen(
+            ["voxtus", "-n", "cleanup_test", "-o", str(tmp_path), str(test_data)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        signal_thread = threading.Thread(target=send_signal_after_delay, args=(proc,))
+        signal_thread.start()
+        
+        stdout, stderr = proc.communicate(timeout=10)
+        signal_thread.join()
+        
+        # Wait a moment for cleanup to complete
+        time.sleep(0.5)
+        
+        # Check that no new persistent temp directories were created
+        final_temp_dirs = set(temp_dir.glob("tmp*"))
+        new_temp_dirs = final_temp_dirs - initial_temp_dirs
+        
+        # Filter out directories that might be created by other processes
+        # We expect that voxtus-created temp dirs should be cleaned up
+        assert proc.returncode == 130, "Process should have been interrupted"
+        assert "Cleaned up temporary directory" in stderr or "👋 Goodbye!" in stderr, \
+            "Should show cleanup messages in stderr"

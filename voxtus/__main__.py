@@ -56,6 +56,7 @@ See <https://www.gnu.org/licenses/agpl-3.0.html> for full license text.
 import argparse
 import importlib.metadata
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,30 @@ from .formats import (get_supported_formats, write_format,
                       write_format_to_stdout)
 
 __version__ = importlib.metadata.version("voxtus")
+
+# Global context for cleanup on signal interruption
+_cleanup_context: Optional['ProcessingContext'] = None
+
+def signal_handler(signum: int, frame) -> None:
+    """Handle CTRL+C (SIGINT) and SIGTERM gracefully."""
+    signal_names = {
+        signal.SIGINT: "SIGINT (CTRL+C)",
+        signal.SIGTERM: "SIGTERM"
+    }
+    signal_name = signal_names.get(signum, f"signal {signum}")
+    print(f"\n⚠️  Received {signal_name}. Cleaning up and exiting...", file=sys.stderr)
+    
+    # Clean up temporary directory if context exists
+    if _cleanup_context and _cleanup_context.workdir.exists():
+        try:
+            shutil.rmtree(_cleanup_context.workdir, ignore_errors=True)
+            print(f"🗑️  Cleaned up temporary directory: {_cleanup_context.workdir}", file=sys.stderr)
+        except Exception:
+            pass  # Ignore cleanup errors during signal handling
+    
+    print("👋 Goodbye!", file=sys.stderr)
+    exit_code = 130 if signum == signal.SIGINT else 143  # Standard exit codes
+    sys.exit(exit_code)
 
 
 @dataclass
@@ -333,9 +358,18 @@ def get_final_name(title: str, custom_name: Optional[str]) -> str:
 def check_file_overwrite(final_transcript: Path, overwrite_files: bool) -> None:
     """Check if file should be overwritten and handle user confirmation."""
     if final_transcript.exists() and not overwrite_files:
-        response = input(f"⚠️ Transcript file '{final_transcript}' already exists. Overwrite? [y/N] ").lower()
-        if response != 'y':
-            raise ValueError("User aborted")
+        try:
+            response = input(f"⚠️ Transcript file '{final_transcript}' already exists. Overwrite? [y/N] ").lower()
+            if response != 'y':
+                raise ValueError("User aborted")
+        except EOFError:
+            # Handle CTRL+D (EOF) gracefully
+            print("\n⚠️  EOF received. Aborting operation.", file=sys.stderr)
+            raise ValueError("User aborted with EOF")
+        except KeyboardInterrupt:
+            # Handle CTRL+C gracefully (though signal handler should catch this)
+            print("\n⚠️  Interrupted by user. Aborting operation.", file=sys.stderr)
+            raise ValueError("User interrupted")
 
 
 def create_transcript_file(audio_file: Path, ctx: ProcessingContext, title: str) -> list[Path]:
@@ -500,19 +534,46 @@ def create_processing_context(config: Config) -> ProcessingContext:
 
 def main() -> None:
     """Main entry point."""
-    args = parse_arguments()
-    validate_arguments(args)
-    config = create_config(args)
-    ctx = create_processing_context(config)
-    check_ffmpeg(ctx.vprint)
+    global _cleanup_context
+    
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     
     try:
-        result = process_audio(ctx)
-        if not is_successful(result):
-            print(f"Error: {result.failure()}", file=sys.stderr)
-            sys.exit(1)
+        args = parse_arguments()
+        validate_arguments(args)
+        config = create_config(args)
+        ctx = create_processing_context(config)
+        
+        # Set global context for signal handler cleanup
+        _cleanup_context = ctx
+        
+        check_ffmpeg(ctx.vprint)
+        
+        try:
+            result = process_audio(ctx)
+            if not is_successful(result):
+                print(f"Error: {result.failure()}", file=sys.stderr)
+                sys.exit(1)
+        except KeyboardInterrupt:
+            # Additional KeyboardInterrupt handling (backup to signal handler)
+            print(f"\n⚠️  Operation interrupted by user.", file=sys.stderr)
+            sys.exit(130)
+            
+    except KeyboardInterrupt:
+        # Handle interruption during setup phase
+        print(f"\n⚠️  Setup interrupted by user.", file=sys.stderr)
+        sys.exit(130)
+    except EOFError:
+        # Handle EOF during any input operations
+        print(f"\n⚠️  EOF received during input. Exiting.", file=sys.stderr)
+        sys.exit(1)
     finally:
-        shutil.rmtree(ctx.workdir, ignore_errors=True)
+        # Always clean up, even if _cleanup_context is None
+        if _cleanup_context and _cleanup_context.workdir.exists():
+            shutil.rmtree(_cleanup_context.workdir, ignore_errors=True)
+        _cleanup_context = None
 
 
 if __name__ == "__main__":
