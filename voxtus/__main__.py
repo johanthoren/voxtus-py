@@ -6,7 +6,7 @@ This CLI tool supports:
 - Processing local media files (audio/video formats)
 - Transcribing using the Whisper model via faster-whisper
 - Multiple output formats: TXT, JSON, SRT, VTT
-- Rich metadata in JSON format
+- Rich metadata in JSON, and VTT formats
 - Multiple format output in a single run
 - Optional verbose output and audio retention
 - Output directory customization
@@ -16,26 +16,29 @@ Output Formats:
 - TXT: Plain text with timestamps (default, LLM-friendly)
 - JSON: Structured data with metadata (title, source, duration, etc.)
 - SRT: SubRip subtitle format for video players
-- VTT: WebVTT subtitle format for web browsers
+- VTT: WebVTT subtitle format for web browsers with metadata (title, source, duration, etc.)
 
 Examples:
     # Basic transcription (default TXT format)
-    voxtus video.mp4
+    voxtus -f txt video.mp4
+
+    # Basic transcription of online video
+    voxtus https://youtu.be/dQw4w9WgXcQ
 
     # Multiple formats
-    voxtus video.mp4 -f txt,json,srt,vtt
+    voxtus -f txt,json,srt,vtt video.mp4
 
     # SRT format for subtitles
-    voxtus video.mp4 -f srt
+    voxtus -f srt video.mp4
 
     # VTT format for web video
-    voxtus video.mp4 -f vtt
+    voxtus -f vtt video.mp4
 
     # JSON format to stdout for processing
-    voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
+    voxtus -f json --stdout video.mp4 | jq '.metadata.duration'
 
     # Custom output name and directory
-    voxtus video.mp4 -f json -n "my_transcript" -o ~/transcripts
+    voxtus -f json -n "my_transcript" -o ~/transcripts video.mp4
 
 Author: Johan Thorén
 License: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
