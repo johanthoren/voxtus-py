@@ -99,8 +99,13 @@ release: verify-uv ## Bump version, commit, tag and push (args: patch|minor|majo
 	@echo "✅ Working directory is clean"
 	@# Run tests
 	@echo "🧪 Running tests with coverage..."
-	@coverage_output=$$(uv run pytest --cov=voxtus --cov-report=term-missing 2>&1); \
+	@set -e; \
+	coverage_output=$$(uv run pytest --cov=voxtus --cov-report=term-missing 2>&1) || { \
+		echo "❌ Tests failed! Release aborted."; \
+		exit 1; \
+	}; \
 	echo "$$coverage_output"; \
+	echo "✅ All tests passed"; \
 	coverage_percent=$$(echo "$$coverage_output" | grep -o 'TOTAL.*[0-9]\+%' | grep -o '[0-9]\+%' | sed 's/%//'); \
 	if [ -n "$$coverage_percent" ] && [ "$$coverage_percent" -lt 80 ]; then \
 		echo "⚠️  Coverage is $$coverage_percent% (below 80% threshold)"; \
