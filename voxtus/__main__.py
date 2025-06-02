@@ -232,7 +232,7 @@ def create_ydl_options(debug: bool, stdout_mode: bool, output_path: Path) -> dic
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '192',
+            'preferredquality': '320',
         }],
         'enable_file_urls': True,
     }
