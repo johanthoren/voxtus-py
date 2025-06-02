@@ -149,6 +149,12 @@ AVAILABLE_MODELS = {
         "vram": "~10GB",
         "languages": "multilingual"
     },
+    "distil-large-v3": {
+        "description": "Distilled large model, faster with good accuracy, 756M parameters",
+        "params": "756M",
+        "vram": "~6GB",
+        "languages": "multilingual"
+    },
     "turbo": {
         "description": "Optimized for speed, 809M parameters",
         "params": "809M",
@@ -657,7 +663,7 @@ def list_available_models() -> None:
         "Base Models": ["base", "base.en"], 
         "Small Models": ["small", "small.en"],
         "Medium Models": ["medium", "medium.en"],
-        "Large Models": ["large-v3", "large", "turbo"]
+        "Large Models": ["distil-large-v3", "large-v3", "large", "turbo"]
     }
     
     for group_name, models in model_groups.items():
@@ -665,15 +671,16 @@ def list_available_models() -> None:
         for model in models:
             if model in AVAILABLE_MODELS:
                 info = AVAILABLE_MODELS[model]
-                print(f"   {model:<15} - {info['description']}")
-                print(f"                   📊 {info['params']} params, {info['vram']} VRAM, {info['languages']}")
+                print(f"   {model:<18} - {info['description']}")
+                print(f"                      📊 {info['params']} params, {info['vram']} VRAM, {info['languages']}")
         print()
     
     print("💡 Usage examples:")
-    print("   voxtus video.mp4 --model tiny      # Fastest transcription")
-    print("   voxtus video.mp4 --model small     # Good balance (default)")
-    print("   voxtus video.mp4 --model large-v3  # Best accuracy")
-    print("   voxtus audio.mp3 --model small.en  # English-only, faster")
+    print("   voxtus --model tiny video.mp4            # Fastest transcription")
+    print("   voxtus --model small video.mp4           # Good balance (default)")
+    print("   voxtus --model distil-large-v3 video.mp4 # Better accuracy, faster than large")
+    print("   voxtus --model large-v3 video.mp4        # Best accuracy")
+    print("   voxtus --model small.en audio.mp3        # English-only, faster")
 
 
 def validate_model(model: str) -> str:

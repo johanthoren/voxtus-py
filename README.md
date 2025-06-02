@@ -178,6 +178,7 @@ Voxtus supports multiple Whisper models with different trade-offs between speed,
 | **small.en** | 244M | ~2GB | English only | Higher accuracy English |
 | **medium** | 769M | ~5GB | Multilingual | Good accuracy, slower |
 | **medium.en** | 769M | ~5GB | English only | Good accuracy English |
+| **distil-large-v3** | 756M | ~6GB | Multilingual | Faster with good accuracy |
 | **large** | 1550M | ~10GB | Multilingual | Highest accuracy |
 | **large-v2** | 1550M | ~10GB | Multilingual | Improved large model |
 | **large-v3** | 1550M | ~10GB | Multilingual | Latest large model |
@@ -192,16 +193,19 @@ Voxtus supports multiple Whisper models with different trade-offs between speed,
 voxtus --list-models
 
 # Speed-optimized (fastest)
-voxtus video.mp4 --model tiny
+voxtus --model tiny video.mp4
 
 # Balanced (default)
-voxtus video.mp4 --model small
+voxtus --model small video.mp4
+
+# Better accuracy with speed
+voxtus --model distil-large-v3 video.mp4
 
 # Quality-optimized (most accurate)
-voxtus video.mp4 --model large-v3
+voxtus --model large-v3 video.mp4
 
 # English-only (faster for English content)
-voxtus video.mp4 --model small.en
+voxtus --model small.en video.mp4
 ```
 
 **💡 Tip**: English-only models (`.en`) are faster and more accurate for English content, while multilingual models work with 99+ languages.
@@ -224,16 +228,16 @@ voxtus recording.mp3
 
 ```bash
 # Single format
-voxtus video.mp4 -f json
+voxtus -f json video.mp4
 
 # Multiple formats at once
-voxtus video.mp4 -f txt,json,srt,vtt
+voxtus -f txt,json,srt,vtt video.mp4
 
 # SRT format for video subtitles
-voxtus video.mp4 -f srt
+voxtus -f srt video.mp4
 
 # VTT format for web video
-voxtus video.mp4 -f vtt
+voxtus -f vtt video.mp4
 ```
 
 ### Advanced Usage
@@ -246,28 +250,28 @@ voxtus -f json -n "meeting_notes" -o ~/transcripts video.mp4
 voxtus -v -k -f txt,json https://youtu.be/example
 
 # Pipeline integration
-voxtus video.mp4 -f json --stdout | jq '.metadata.duration'
+voxtus -f json --stdout video.mp4 | jq '.metadata.duration'
 
 # Overwrite existing files
-voxtus video.mp4 -f json --overwrite
+voxtus -f json --overwrite video.mp4
 
 # Model selection for different use cases
-voxtus video.mp4 --model tiny -f txt    # Fast transcription
-voxtus video.mp4 --model large-v3       # Best quality
-voxtus podcast.mp3 --model small.en     # English podcast
+voxtus --model tiny -f txt video.mp4     # Fast transcription
+voxtus --model large-v3 video.mp4        # Best quality
+voxtus --model small.en podcast.mp3      # English podcast
 ```
 
 ### Real-world Examples
 
 ```bash
 # Generate data for analysis
-voxtus podcast.mp3 -f json -o ~/podcast_analysis
+voxtus -f json -o ~/podcast_analysis podcast.mp3
 
 # LLM processing pipeline
-voxtus lecture.mp4 -f txt --stdout | llm "summarize this lecture"
+voxtus -f txt --stdout lecture.mp4 | llm "summarize this lecture"
 
 # Both formats for different uses
-voxtus interview.mp4 -f txt,json -n "interview_2024"
+voxtus -f txt,json -n "interview_2024" interview.mp4
 ```
 
 ---
