@@ -109,7 +109,7 @@ class TestCreateYdlOptions:
         assert len(result['postprocessors']) == 1
         assert result['postprocessors'][0]['key'] == 'FFmpegExtractAudio'
         assert result['postprocessors'][0]['preferredcodec'] == 'mp3'
-        assert result['postprocessors'][0]['preferredquality'] == '192'
+        assert result['postprocessors'][0]['preferredquality'] == '320'
     
     def test_stdout_mode_options(self):
         """Test options when stdout mode is enabled."""
