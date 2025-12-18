@@ -1,7 +1,7 @@
 [project]
 name = "voxtus"
-version = "0.3.1"
-description = "Transcribe Internet videos and media files to text using faster-whisper"
+version = "0.3.2"
+description = "[DEPRECATED - Use 'cargo install voxtus' instead] Transcribe Internet videos and media files to text"
 authors = [{ name = "Johan Thorén", email = "johan@thoren.xyz" }]
 readme = "README.md"
 requires-python = ">=3.9"
