@@ -1,4 +1,10 @@
-# 🗣️ Voxtus
+# 🗣️ Voxtus (Python - Deprecated)
+
+> **⚠️ DEPRECATED:** This Python version is no longer maintained. Please use the new Rust implementation: [github.com/johanthoren/voxtus](https://github.com/johanthoren/voxtus)
+>
+> Install the new version with: `cargo install voxtus`
+
+---
 
 **Voxtus is a command-line tool for transcribing Internet videos and media files to text using [faster-whisper](https://github.com/guillaumekln/faster-whisper).**
 
